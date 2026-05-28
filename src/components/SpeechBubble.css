@@ -1,8 +1,10 @@
 .speech-bubble {
+  --bubble-fill: var(--bubble-bg, #ffffff);
+  --bubble-stroke: var(--border);
   position: relative;
-  background: var(--bubble-bg, #ffffff);
+  background: var(--bubble-fill);
   color: var(--text-h);
-  border: 1px solid var(--border);
+  border: 1px solid var(--bubble-stroke);
   border-radius: 14px;
   padding: 10px 14px;
   font-size: 0.95rem;
@@ -13,6 +15,26 @@
   opacity: 0;
   transform: translateY(4px);
   animation: bubble-in 0.45s ease forwards;
+}
+
+.speech-bubble[data-tone="ideal"] {
+  --bubble-fill: rgba(107, 142, 78, 0.08);
+  --bubble-stroke: #6b8e4e;
+}
+
+.speech-bubble[data-tone="okay"] {
+  --bubble-fill: rgba(200, 166, 79, 0.08);
+  --bubble-stroke: #c8a64f;
+}
+
+.speech-bubble[data-tone="poor"] {
+  --bubble-fill: rgba(199, 93, 58, 0.08);
+  --bubble-stroke: #c75d3a;
+}
+
+.speech-bubble[data-tone="bad"] {
+  --bubble-fill: rgba(168, 50, 50, 0.10);
+  --bubble-stroke: #a83232;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -41,9 +63,9 @@
   transform: translateX(-50%) rotate(45deg);
   width: 12px;
   height: 12px;
-  background: var(--bubble-bg, #ffffff);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  background: var(--bubble-fill);
+  border-right: 1px solid var(--bubble-stroke);
+  border-bottom: 1px solid var(--bubble-stroke);
 }
 
 @media (prefers-color-scheme: dark) {
