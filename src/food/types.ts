@@ -13,5 +13,6 @@ export type Food = {
   emoji: string
   cost: number         // in coins (simple abstract currency)
   prepMinutes: number  // active hands-on prep time
+  packable: boolean    // does it survive in a lunchbox until noon?
   reactions: Record<LifeStage, MealReaction>
 }

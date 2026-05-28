@@ -7,6 +7,7 @@ export const defaultPantry: Food[] = [
     emoji: '🥛',
     cost: 2,
     prepMinutes: 1,
+    packable: true,  // with a cold pack
     reactions: {
       baby:  { tone: 'ideal', message: 'Yum, smooth! 😊' },
       child: { tone: 'okay',  message: "Eh, it's fine." },
@@ -20,6 +21,7 @@ export const defaultPantry: Food[] = [
     emoji: '🥣',
     cost: 1,
     prepMinutes: 5,
+    packable: false,  // gets cold and soggy
     reactions: {
       baby:  { tone: 'ideal', message: 'Mmm warm!' },
       child: { tone: 'ideal', message: 'Big bowl please!' },
@@ -33,6 +35,7 @@ export const defaultPantry: Food[] = [
     emoji: '🍞',
     cost: 1,
     prepMinutes: 1,
+    packable: true,  // sandwich-ready
     reactions: {
       baby:  { tone: 'poor', message: 'Just bread? Hmm.' },
       child: { tone: 'okay', message: 'Need more than this!' },
@@ -46,6 +49,7 @@ export const defaultPantry: Food[] = [
     emoji: '🍎',
     cost: 2,
     prepMinutes: 1,
+    packable: true,  // perfect lunchbox food
     reactions: {
       baby:  { tone: 'bad',   message: 'Too hard for me!' },
       child: { tone: 'ideal', message: 'Crunch crunch!' },
@@ -59,6 +63,7 @@ export const defaultPantry: Food[] = [
     emoji: '🥚',
     cost: 2,
     prepMinutes: 6,
+    packable: false,  // scrambled at noon = no
     reactions: {
       baby:  { tone: 'poor',  message: 'Tummy ache...' },
       child: { tone: 'ideal', message: 'Protein power!' },
@@ -72,6 +77,7 @@ export const defaultPantry: Food[] = [
     emoji: '☕',
     cost: 3,
     prepMinutes: 4,
+    packable: false,  // no hot drinks for the lunchbox
     reactions: {
       baby:  { tone: 'bad',   message: "Babies can't have coffee!" },
       child: { tone: 'bad',   message: "Coffee isn't for kids!" },

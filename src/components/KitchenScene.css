@@ -192,6 +192,25 @@
   transform: translateY(-2px);
 }
 
+.pantry-item-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.pantry-item-disabled:hover {
+  transform: none;
+  border-color: var(--border);
+}
+
+.budget-bar .budget-label {
+  font-size: 0.8rem;
+  color: var(--leaf);
+  font-style: italic;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
 .pantry-item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
