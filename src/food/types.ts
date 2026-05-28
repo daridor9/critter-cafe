@@ -11,5 +11,7 @@ export type Food = {
   id: string
   name: string
   emoji: string
+  cost: number         // in coins (simple abstract currency)
+  prepMinutes: number  // active hands-on prep time
   reactions: Record<LifeStage, MealReaction>
 }

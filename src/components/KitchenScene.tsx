@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { defaultFamily } from '../family/defaultFamily'
 import { defaultPantry } from '../food/pantry'
+import { dailyBudgets } from '../food/budget'
 import type { Food, MealReaction } from '../food/types'
 import { FamilyMember } from './FamilyMember'
 import './KitchenScene.css'
@@ -16,6 +17,8 @@ export function KitchenScene({ onExit }: Props) {
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<Record<string, string | null>>({})
 
+  const budget = dailyBudgets.breakfast
+
   const findFood = (id: string | null | undefined): Food | undefined =>
     id ? defaultPantry.find(f => f.id === id) : undefined
 
@@ -26,7 +29,20 @@ export function KitchenScene({ onExit }: Props) {
     return food.reactions[member.profile.lifeStage]
   }
 
+  const totalCost = defaultFamily.reduce((sum, m) => {
+    const food = findFood(assignments[m.id])
+    return sum + (food?.cost ?? 0)
+  }, 0)
+
+  const totalMinutes = defaultFamily.reduce((sum, m) => {
+    const food = findFood(assignments[m.id])
+    return sum + (food?.prepMinutes ?? 0)
+  }, 0)
+
   const allAssigned = defaultFamily.every(m => assignments[m.id])
+  const overBudget = totalCost > budget.coins
+  const overTime = totalMinutes > budget.minutes
+  const canServe = allAssigned && !overBudget && !overTime
 
   const startPlanning = () => {
     setState('planning')
@@ -49,6 +65,15 @@ export function KitchenScene({ onExit }: Props) {
     setAssignments({})
     setSelectedFoodId(null)
   }
+
+  const planningHint = (() => {
+    if (overBudget && overTime) return 'Over budget AND over time — swap for something cheaper and faster.'
+    if (overBudget) return 'Over budget — try a cheaper choice.'
+    if (overTime) return 'Over time — try something faster.'
+    if (!allAssigned && selectedFoodId) return 'Now tap a plate to serve it.'
+    if (!allAssigned) return "Pick a food, then tap who you're serving."
+    return 'Looks good — serve when ready.'
+  })()
 
   return (
     <main className="kitchen-scene">
@@ -100,11 +125,16 @@ export function KitchenScene({ onExit }: Props) {
 
       {state === 'planning' && (
         <section className="pantry" aria-label="Pantry">
-          <p className="pantry-hint">
-            {selectedFoodId
-              ? 'Now tap a plate to serve it.'
-              : "Pick a food, then tap who you're serving."}
-          </p>
+          <div className="budget-bar" aria-label="Budget tracker">
+            <span className={overBudget ? 'budget-over' : ''} aria-label={`Spent ${totalCost} of ${budget.coins} coins`}>
+              💰 {totalCost} / {budget.coins}
+            </span>
+            <span className="budget-divider" aria-hidden="true">·</span>
+            <span className={overTime ? 'budget-over' : ''} aria-label={`Used ${totalMinutes} of ${budget.minutes} minutes`}>
+              ⏱ {totalMinutes} / {budget.minutes} min
+            </span>
+          </div>
+          <p className="pantry-hint">{planningHint}</p>
           <div className="pantry-row">
             {defaultPantry.map(food => (
               <button
@@ -113,9 +143,13 @@ export function KitchenScene({ onExit }: Props) {
                 className={`pantry-item ${selectedFoodId === food.id ? 'pantry-item-selected' : ''}`}
                 onClick={() => setSelectedFoodId(food.id)}
                 aria-pressed={selectedFoodId === food.id}
+                aria-label={`${food.name}, costs ${food.cost} coins, takes ${food.prepMinutes} minutes`}
               >
                 <span className="pantry-item-emoji" aria-hidden="true">{food.emoji}</span>
                 <span className="pantry-item-name">{food.name}</span>
+                <span className="pantry-item-meta" aria-hidden="true">
+                  💰 {food.cost} · ⏱ {food.prepMinutes}m
+                </span>
               </button>
             ))}
           </div>
@@ -124,7 +158,7 @@ export function KitchenScene({ onExit }: Props) {
               type="button"
               className="primary-action"
               onClick={serve}
-              disabled={!allAssigned}
+              disabled={!canServe}
             >
               🍽 Serve breakfast
             </button>

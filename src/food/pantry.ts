@@ -5,6 +5,8 @@ export const defaultPantry: Food[] = [
     id: 'yogurt',
     name: 'Yogurt',
     emoji: '🥛',
+    cost: 2,
+    prepMinutes: 1,
     reactions: {
       baby:  { tone: 'ideal', message: 'Yum, smooth! 😊' },
       child: { tone: 'okay',  message: "Eh, it's fine." },
@@ -16,6 +18,8 @@ export const defaultPantry: Food[] = [
     id: 'oatmeal',
     name: 'Oatmeal',
     emoji: '🥣',
+    cost: 1,
+    prepMinutes: 5,
     reactions: {
       baby:  { tone: 'ideal', message: 'Mmm warm!' },
       child: { tone: 'ideal', message: 'Big bowl please!' },
@@ -27,6 +31,8 @@ export const defaultPantry: Food[] = [
     id: 'bread',
     name: 'Bread',
     emoji: '🍞',
+    cost: 1,
+    prepMinutes: 1,
     reactions: {
       baby:  { tone: 'poor', message: 'Just bread? Hmm.' },
       child: { tone: 'okay', message: 'Need more than this!' },
@@ -38,6 +44,8 @@ export const defaultPantry: Food[] = [
     id: 'apple',
     name: 'Apple',
     emoji: '🍎',
+    cost: 2,
+    prepMinutes: 1,
     reactions: {
       baby:  { tone: 'bad',   message: 'Too hard for me!' },
       child: { tone: 'ideal', message: 'Crunch crunch!' },
@@ -49,6 +57,8 @@ export const defaultPantry: Food[] = [
     id: 'eggs',
     name: 'Eggs',
     emoji: '🥚',
+    cost: 2,
+    prepMinutes: 6,
     reactions: {
       baby:  { tone: 'poor',  message: 'Tummy ache...' },
       child: { tone: 'ideal', message: 'Protein power!' },
@@ -60,6 +70,8 @@ export const defaultPantry: Food[] = [
     id: 'coffee',
     name: 'Coffee',
     emoji: '☕',
+    cost: 3,
+    prepMinutes: 4,
     reactions: {
       baby:  { tone: 'bad',   message: "Babies can't have coffee!" },
       child: { tone: 'bad',   message: "Coffee isn't for kids!" },
