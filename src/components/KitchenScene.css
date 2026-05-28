@@ -22,8 +22,21 @@
   font-size: 0.95rem;
 }
 
+.kitchen-header .header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .kitchen-header .day-marker {
   font-weight: 500;
+}
+
+.kitchen-header .kitchen-subtitle {
+  font-size: 0.8rem;
+  color: var(--leaf);
+  font-style: italic;
+  letter-spacing: 0.3px;
 }
 
 .kitchen-header .brand-mark {

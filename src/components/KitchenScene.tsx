@@ -6,7 +6,10 @@ export function KitchenScene() {
   return (
     <main className="kitchen-scene">
       <header className="kitchen-header">
-        <span className="day-marker">☀ Day 1 — Morning</span>
+        <div className="header-left">
+          <span className="day-marker">☀ Day 1 — Morning</span>
+          <span className="kitchen-subtitle">Mediterranean Kitchen 🫒</span>
+        </div>
         <span className="brand-mark">Critter Cafe</span>
       </header>
 
