@@ -45,6 +45,25 @@
   font-weight: 700;
 }
 
+.kitchen-header .brand-mark-button {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  cursor: pointer;
+  font-size: inherit;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.kitchen-header .brand-mark-button:hover {
+  opacity: 0.75;
+}
+
+.kitchen-header .brand-mark-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .family-row {
   display: flex;
   gap: 8px;

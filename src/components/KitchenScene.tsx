@@ -2,7 +2,11 @@ import { defaultFamily } from '../family/defaultFamily'
 import { FamilyMember } from './FamilyMember'
 import './KitchenScene.css'
 
-export function KitchenScene() {
+type Props = {
+  onExit: () => void
+}
+
+export function KitchenScene({ onExit }: Props) {
   return (
     <main className="kitchen-scene">
       <header className="kitchen-header">
@@ -10,7 +14,14 @@ export function KitchenScene() {
           <span className="day-marker">☀ Day 1 — Morning</span>
           <span className="kitchen-subtitle">Mediterranean Kitchen 🫒</span>
         </div>
-        <span className="brand-mark">Critter Cafe</span>
+        <button
+          type="button"
+          className="brand-mark brand-mark-button"
+          onClick={onExit}
+          aria-label="Back to title screen"
+        >
+          Critter Cafe
+        </button>
       </header>
 
       <section className="family-row" aria-label="Family">
