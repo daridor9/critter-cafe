@@ -1,0 +1,43 @@
+.family-member {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1 1 0;
+  padding: 8px;
+}
+
+.family-member .character {
+  font-size: 5.5rem;
+  line-height: 1;
+  user-select: none;
+  animation: character-idle 3.5s ease-in-out infinite;
+}
+
+.family-member-baby .character { font-size: 4rem; }
+.family-member-elder .character { font-size: 5rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .family-member .character {
+    animation: none;
+  }
+}
+
+@keyframes character-idle {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.03) translateY(-2px); }
+}
+
+.family-member .name-label {
+  font-size: 0.95rem;
+  color: var(--text);
+  letter-spacing: 0.3px;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .family-member .character { font-size: 4rem; }
+  .family-member-baby .character { font-size: 3rem; }
+  .family-member-elder .character { font-size: 3.6rem; }
+}

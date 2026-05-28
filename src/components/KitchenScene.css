@@ -1,0 +1,68 @@
+.kitchen-scene {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding: 24px;
+  gap: 24px;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, var(--bg) 0%, #f4ead3 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .kitchen-scene {
+    background: linear-gradient(180deg, var(--bg) 0%, #2a2117 100%);
+  }
+}
+
+.kitchen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.kitchen-header .day-marker {
+  font-weight: 500;
+}
+
+.kitchen-header .brand-mark {
+  font-family: var(--heading);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.family-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: end;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  padding: 16px 0;
+}
+
+@media (max-width: 720px) {
+  .family-row {
+    gap: 16px;
+  }
+}
+
+.kitchen-floor {
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #a07a5a 20%, #a07a5a 80%, transparent);
+  border-radius: 2px;
+  opacity: 0.5;
+}
+
+.kitchen-footer {
+  text-align: center;
+  color: var(--text);
+  font-size: 0.9rem;
+  opacity: 0.75;
+  padding: 8px 16px 0 16px;
+}
+
+.kitchen-footer p {
+  margin: 0;
+}
