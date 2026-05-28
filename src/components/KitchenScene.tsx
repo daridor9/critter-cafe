@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { defaultFamily } from '../family/defaultFamily'
 import { defaultPantry } from '../food/pantry'
 import { dailyBudgets } from '../food/budget'
+import { computeDayEnergy } from '../family/energy'
 import type { Food, MealReaction } from '../food/types'
 import { FamilyMember } from './FamilyMember'
 import './KitchenScene.css'
@@ -16,6 +17,7 @@ type KitchenState =
   | 'breakfast-served'
   | 'packing-lunch'
   | 'lunch-packed'
+  | 'end-of-day'
 
 const CHILD_ID = 'child'
 
@@ -42,7 +44,26 @@ export function KitchenScene({ onExit }: Props) {
     return food.reactions[child.profile.lifeStage]
   }
 
-  // Active budget + totals depend on which meal we're planning.
+  // ---- consumed-foods per member (drives calorie counter + day energy) ----
+  const consumedFoodsFor = (memberId: string): Food[] => {
+    const foods: Food[] = []
+    // Breakfast counts once it's been served.
+    if (state !== 'idle' && state !== 'planning-breakfast') {
+      const f = findFood(breakfastAssignments[memberId])
+      if (f) foods.push(f)
+    }
+    // School lunch counts only for the child, once packed (they eat it at school).
+    if ((state === 'lunch-packed' || state === 'end-of-day') && memberId === CHILD_ID) {
+      const f = findFood(lunchFood)
+      if (f) foods.push(f)
+    }
+    return foods
+  }
+
+  const caloriesFor = (memberId: string): number =>
+    consumedFoodsFor(memberId).reduce((sum, f) => sum + f.calories, 0)
+
+  // ---- meal budgets ----
   const isBreakfast = state === 'planning-breakfast'
   const isLunch = state === 'packing-lunch'
   const activeBudget = isLunch ? dailyBudgets.schoolLunch : dailyBudgets.breakfast
@@ -87,6 +108,9 @@ export function KitchenScene({ onExit }: Props) {
     setState('lunch-packed')
     setSelectedFoodId(null)
   }
+  const goToEndOfDay = () => {
+    setState('end-of-day')
+  }
   const reset = () => {
     setState('idle')
     setBreakfastAssignments({})
@@ -100,19 +124,21 @@ export function KitchenScene({ onExit }: Props) {
       setBreakfastAssignments(prev => ({ ...prev, [memberId]: selectedFoodId }))
     } else if (state === 'packing-lunch' && memberId === CHILD_ID) {
       const food = findFood(selectedFoodId)
-      if (food?.packable) {
-        setLunchFood(selectedFoodId)
-      }
+      if (food?.packable) setLunchFood(selectedFoodId)
     }
   }
 
   // ---- speech bubble logic ----
-  // After breakfast served, bubbles show breakfast reactions through every later state.
-  // After lunch packed, child's bubble shows the lunch reaction instead.
   const showsBreakfastReactions =
     state === 'breakfast-served' || state === 'packing-lunch' || state === 'lunch-packed'
 
   const speechFor = (memberId: string): { message?: string; tone?: MealReaction['tone'] } => {
+    if (state === 'end-of-day') {
+      const member = defaultFamily.find(m => m.id === memberId)
+      if (!member) return {}
+      const report = computeDayEnergy(member, consumedFoodsFor(memberId))
+      return { message: report.verdict, tone: report.tone }
+    }
     if (state === 'lunch-packed' && memberId === CHILD_ID) {
       const r = getLunchReaction()
       return { message: r ? `For lunch: ${r.message}` : undefined, tone: r?.tone }
@@ -168,7 +194,7 @@ export function KitchenScene({ onExit }: Props) {
 
     const ariaLabel = itemDisabled
       ? `${food.name} — doesn't travel well, can't pack`
-      : `${food.name}, costs ${food.cost} coins, takes ${food.prepMinutes} minutes`
+      : `${food.name}, ${food.calories} calories, costs ${food.cost} coins, takes ${food.prepMinutes} minutes`
 
     return (
       <button
@@ -184,11 +210,20 @@ export function KitchenScene({ onExit }: Props) {
         <span className="pantry-item-emoji" aria-hidden="true">{food.emoji}</span>
         <span className="pantry-item-name">{food.name}</span>
         <span className="pantry-item-meta" aria-hidden="true">
-          💰 {food.cost} · ⏱ {food.prepMinutes}m
+          🔥 {food.calories} · 💰 {food.cost} · ⏱ {food.prepMinutes}m
         </span>
       </button>
     )
   }
+
+  // ---- show calorie counters once breakfast has been served onwards ----
+  const showCalories = state !== 'idle' && state !== 'planning-breakfast'
+
+  // ---- end-of-day reports ----
+  const dayReports = state === 'end-of-day'
+    ? defaultFamily.map(m => ({ member: m, report: computeDayEnergy(m, consumedFoodsFor(m.id)) }))
+    : []
+  const everyoneFed = dayReports.every(r => r.report.status === 'well-fed' || r.report.status === 'comfortable')
 
   return (
     <main className="kitchen-scene">
@@ -219,6 +254,7 @@ export function KitchenScene({ onExit }: Props) {
               speechTone={tone}
               assignedFood={plateFor(member.id)}
               onPlateClick={() => onPlateClick(member.id)}
+              caloriesConsumed={showCalories ? caloriesFor(member.id) : undefined}
             />
           )
         })}
@@ -237,34 +273,20 @@ export function KitchenScene({ onExit }: Props) {
       {(isBreakfast || isLunch) && (
         <section className="pantry" aria-label={isLunch ? 'School-lunch pantry' : 'Breakfast pantry'}>
           <div className="budget-bar" aria-label="Budget tracker">
-            <span className={overBudget ? 'budget-over' : ''} aria-label={`Spent ${totalCost} of ${activeBudget.coins} coins`}>
-              💰 {totalCost} / {activeBudget.coins}
-            </span>
+            <span className={overBudget ? 'budget-over' : ''}>💰 {totalCost} / {activeBudget.coins}</span>
             <span className="budget-divider" aria-hidden="true">·</span>
-            <span className={overTime ? 'budget-over' : ''} aria-label={`Used ${totalMinutes} of ${activeBudget.minutes} minutes`}>
-              ⏱ {totalMinutes} / {activeBudget.minutes} min
-            </span>
+            <span className={overTime ? 'budget-over' : ''}>⏱ {totalMinutes} / {activeBudget.minutes} min</span>
             {isLunch && <span className="budget-label">🎒 lunchbox</span>}
           </div>
           <p className="pantry-hint">{planningHint}</p>
           <div className="pantry-row">{defaultPantry.map(renderPantryItem)}</div>
           <div className="kitchen-actions">
             {isBreakfast ? (
-              <button
-                type="button"
-                className="primary-action"
-                onClick={serveBreakfast}
-                disabled={!canServeBreakfast}
-              >
+              <button type="button" className="primary-action" onClick={serveBreakfast} disabled={!canServeBreakfast}>
                 🍽 Serve breakfast
               </button>
             ) : (
-              <button
-                type="button"
-                className="primary-action"
-                onClick={packLunch}
-                disabled={!canPackLunch}
-              >
+              <button type="button" className="primary-action" onClick={packLunch} disabled={!canPackLunch}>
                 🎒 Pack it
               </button>
             )}
@@ -288,10 +310,47 @@ export function KitchenScene({ onExit }: Props) {
 
       {state === 'lunch-packed' && (
         <div className="kitchen-actions">
-          <button type="button" className="primary-action" onClick={reset}>
-            🔄 Start the morning over
+          <button type="button" className="primary-action" onClick={goToEndOfDay}>
+            🌙 See end of day
+          </button>
+          <button type="button" className="secondary-action" onClick={reset}>
+            🔄 Replay morning
           </button>
         </div>
+      )}
+
+      {state === 'end-of-day' && (
+        <section className="day-summary" aria-label="End of day energy report">
+          <h2 className="day-summary-title">🌙 End of Day 1</h2>
+          <ul className="energy-list">
+            {dayReports.map(({ member, report }) => (
+              <li key={member.id} className={`energy-row energy-row-${report.status}`}>
+                <span className="energy-row-who">
+                  <span className="energy-row-emoji" aria-hidden="true">{member.emoji}</span>
+                  <span className="energy-row-name">{member.name}</span>
+                </span>
+                <span className="energy-row-stats">
+                  <span>🔥 in <strong>{report.consumed}</strong> cal</span>
+                  <span>💪 burned <strong>{report.burned}</strong> cal</span>
+                  <span>🎯 needed <strong>{report.target}</strong></span>
+                  <span className="energy-row-bmr">
+                    metabolism ~{member.profile.bmrPerHour} cal/hr + activity {member.profile.activityCalories}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="day-summary-lesson">
+            {everyoneFed
+              ? "Everyone made it through Day 1 with enough fuel. Real bodies need lots of food — that's a balanced day."
+              : "A single breakfast and one packed lunch isn't enough fuel for a real body all day long. Tomorrow we'll add lunch at home, dinner, and snacks — and bigger meals with several foods at once."}
+          </p>
+          <div className="kitchen-actions">
+            <button type="button" className="primary-action" onClick={reset}>
+              🔄 Start the morning over
+            </button>
+          </div>
+        </section>
       )}
 
       <footer className="kitchen-footer">
@@ -299,7 +358,7 @@ export function KitchenScene({ onExit }: Props) {
           <p><em>Breakfast eaten. Now pack the child off to school — what goes in the lunchbox?</em></p>
         )}
         {state === 'lunch-packed' && (
-          <p><em>Lunchbox packed, family fed. Morning routine done.</em></p>
+          <p><em>Morning routine done. Time fast-forwards: who has enough fuel for the day?</em></p>
         )}
         {(isBreakfast || isLunch) && (
           <p><em>Green = ideal · yellow = okay · orange or red = wrong fit.</em></p>

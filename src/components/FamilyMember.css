@@ -36,6 +36,50 @@
   font-weight: 500;
 }
 
+.family-member .energy-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: -4px;
+  min-width: 110px;
+}
+
+.family-member .energy-text {
+  font-size: 0.72rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.family-member .energy-bar {
+  display: block;
+  width: 100px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.family-member .energy-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease, background-color 0.3s ease;
+}
+
+.family-member .energy-good  .energy-fill { background: #6b8e4e; }
+.family-member .energy-okay  .energy-fill { background: #c8a64f; }
+.family-member .energy-low   .energy-fill { background: #c75d3a; }
+.family-member .energy-empty .energy-fill { background: #a83232; }
+.family-member .energy-empty .energy-fill { min-width: 2px; }
+
+@media (prefers-color-scheme: dark) {
+  .family-member .energy-bar {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
 .family-member .plate {
   margin-top: 4px;
   width: 56px;

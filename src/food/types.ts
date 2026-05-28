@@ -14,5 +14,6 @@ export type Food = {
   cost: number         // in coins (simple abstract currency)
   prepMinutes: number  // active hands-on prep time
   packable: boolean    // does it survive in a lunchbox until noon?
+  calories: number     // per serving — real-world rounded values
   reactions: Record<LifeStage, MealReaction>
 }
