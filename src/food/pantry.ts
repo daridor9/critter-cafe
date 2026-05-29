@@ -1,7 +1,7 @@
 import type { Food } from './types'
 
 export const defaultPantry: Food[] = [
-  // ----- Dairy / protein staples -----
+  // ----- Dairy / protein -----
   {
     id: 'yogurt',
     name: 'Yogurt',
@@ -62,6 +62,21 @@ export const defaultPantry: Food[] = [
       elder: { tone: 'ideal', message: 'Good for the heart.' },
     },
   },
+  {
+    id: 'beef',
+    name: 'Beef',
+    emoji: '🥩',
+    cost: 5,
+    prepMinutes: 15,
+    packable: false,
+    calories: 300,
+    reactions: {
+      baby:  { tone: 'bad',   message: 'Way too tough for me!' },
+      child: { tone: 'ideal', message: 'Strong food!' },
+      adult: { tone: 'ideal', message: 'Hearty protein.' },
+      elder: { tone: 'okay',  message: 'A bit heavy on me.' },
+    },
+  },
 
   // ----- Carbs / grains -----
   {
@@ -109,6 +124,36 @@ export const defaultPantry: Food[] = [
       elder: { tone: 'ideal', message: 'Easy on me.' },
     },
   },
+  {
+    id: 'pasta',
+    name: 'Pasta',
+    emoji: '🍝',
+    cost: 2,
+    prepMinutes: 12,
+    packable: false,
+    calories: 250,
+    reactions: {
+      baby:  { tone: 'okay',  message: 'Tiny pieces, ok.' },
+      child: { tone: 'ideal', message: 'PASTA! ❤️' },
+      adult: { tone: 'ideal', message: 'Comfort food.' },
+      elder: { tone: 'okay',  message: 'A bit heavy.' },
+    },
+  },
+  {
+    id: 'quinoa',
+    name: 'Quinoa',
+    emoji: '🌾',
+    cost: 3,
+    prepMinutes: 15,
+    packable: true,
+    calories: 220,
+    reactions: {
+      baby:  { tone: 'okay',  message: 'Tiny grains, ok.' },
+      child: { tone: 'okay',  message: 'Healthy stuff.' },
+      adult: { tone: 'ideal', message: 'Complete protein. Yes.' },
+      elder: { tone: 'ideal', message: 'Nutritious and easy.' },
+    },
+  },
 
   // ----- Fruit & veg -----
   {
@@ -142,6 +187,21 @@ export const defaultPantry: Food[] = [
     },
   },
   {
+    id: 'berries',
+    name: 'Berries',
+    emoji: '🍓',
+    cost: 3,
+    prepMinutes: 1,
+    packable: true,
+    calories: 60,
+    reactions: {
+      baby:  { tone: 'ideal', message: 'Soft and sweet!' },
+      child: { tone: 'ideal', message: 'Sweet and pop!' },
+      adult: { tone: 'ideal', message: 'Antioxidants. Nice.' },
+      elder: { tone: 'ideal', message: 'Sweet and gentle.' },
+    },
+  },
+  {
     id: 'tomato',
     name: 'Tomato',
     emoji: '🍅',
@@ -171,8 +231,38 @@ export const defaultPantry: Food[] = [
       elder: { tone: 'okay',  message: 'Watching my salt.' },
     },
   },
+  {
+    id: 'salad',
+    name: 'Salad',
+    emoji: '🥗',
+    cost: 3,
+    prepMinutes: 5,
+    packable: false,
+    calories: 80,
+    reactions: {
+      baby:  { tone: 'poor',  message: 'Hard to chew for me!' },
+      child: { tone: 'okay',  message: 'Veggies... ok.' },
+      adult: { tone: 'ideal', message: 'Fresh and bright.' },
+      elder: { tone: 'ideal', message: 'Light and healthy.' },
+    },
+  },
 
-  // ----- Sweets & drinks -----
+  // ----- Treats, prepared, drinks -----
+  {
+    id: 'pizza',
+    name: 'Pizza',
+    emoji: '🍕',
+    cost: 4,
+    prepMinutes: 8,
+    packable: true,
+    calories: 280,
+    reactions: {
+      baby:  { tone: 'poor',  message: 'Too cheesy and chewy.' },
+      child: { tone: 'ideal', message: 'PIZZA PARTY! 🎉' },
+      adult: { tone: 'okay',  message: 'Tasty but heavy.' },
+      elder: { tone: 'poor',  message: 'Hard to digest.' },
+    },
+  },
   {
     id: 'honey',
     name: 'Honey',
