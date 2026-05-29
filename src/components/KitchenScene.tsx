@@ -30,7 +30,8 @@ type MealConfig = {
   label: string
   emoji: string
   planState: KitchenState
-  participates: (m: FamilyMember) => boolean
+  hasPlate: (m: FamilyMember) => boolean    // who shows a plate (can be assigned)
+  isRequired: (m: FamilyMember) => boolean  // who MUST be assigned to enable Serve
   serveLabel: string
 }
 
@@ -38,19 +39,22 @@ const MEAL_CONFIG: Record<MealKey, MealConfig> = {
   breakfast: {
     key: 'breakfast', label: 'breakfast', emoji: '🍳',
     planState: 'planning-breakfast',
-    participates: () => true,
+    hasPlate: () => true,
+    isRequired: () => true,
     serveLabel: '🍽 Serve breakfast',
   },
   lunch: {
     key: 'lunch', label: 'lunch', emoji: '🥗',
     planState: 'planning-lunch',
-    participates: (m) => m.id !== CHILD_ID,
+    hasPlate: () => true,                      // child has an optional plate at home lunch
+    isRequired: (m) => m.id !== CHILD_ID,      // but only baby + adult + elder are required
     serveLabel: '🥗 Serve lunch',
   },
   dinner: {
     key: 'dinner', label: 'dinner', emoji: '🍝',
     planState: 'planning-dinner',
-    participates: () => true,
+    hasPlate: () => true,
+    isRequired: () => true,
     serveLabel: '🍝 Serve dinner',
   },
 }
@@ -79,25 +83,35 @@ export function KitchenScene({ onExit }: Props) {
   const findFood = (id: string | null | undefined): Food | undefined =>
     id ? defaultPantry.find(f => f.id === id) : undefined
 
-  // ---- per-character consumed foods (drives calorie counter + day energy) ----
+  // ---- per-character consumed foods ----
+  // Child special-case: home lunch and school lunch are mutually exclusive (same noon).
+  // If child has a home-lunch assignment, that's what she ate; otherwise the packed lunch.
   const consumedFoodsFor = (memberId: string): Food[] => {
     const foods: Food[] = []
+
     if (mealsServed.breakfast) {
       const f = findFood(mealAssignments.breakfast[memberId])
       if (f) foods.push(f)
     }
-    if (memberId === CHILD_ID && mealsServed.schoolLunch) {
-      const f = findFood(schoolLunchFood)
-      if (f) foods.push(f)
-    }
-    if (memberId !== CHILD_ID && mealsServed.lunch) {
+
+    if (memberId === CHILD_ID) {
+      const homeLunch = mealsServed.lunch ? findFood(mealAssignments.lunch[CHILD_ID]) : undefined
+      if (homeLunch) {
+        foods.push(homeLunch)
+      } else if (mealsServed.schoolLunch) {
+        const f = findFood(schoolLunchFood)
+        if (f) foods.push(f)
+      }
+    } else if (mealsServed.lunch) {
       const f = findFood(mealAssignments.lunch[memberId])
       if (f) foods.push(f)
     }
+
     if (mealsServed.dinner) {
       const f = findFood(mealAssignments.dinner[memberId])
       if (f) foods.push(f)
     }
+
     return foods
   }
 
@@ -108,7 +122,8 @@ export function KitchenScene({ onExit }: Props) {
   const currentMeal = currentMealKey(state)
   const currentConfig = currentMeal ? MEAL_CONFIG[currentMeal] : null
   const currentAssignments = currentMeal ? mealAssignments[currentMeal] : null
-  const currentParticipants = currentConfig ? defaultFamily.filter(currentConfig.participates) : []
+  const currentPlateMembers = currentConfig ? defaultFamily.filter(currentConfig.hasPlate) : []
+  const currentRequiredMembers = currentConfig ? defaultFamily.filter(currentConfig.isRequired) : []
 
   const isPlanningMeal = currentMeal !== null
   const isPackingSchoolLunch = state === 'packing-school-lunch'
@@ -118,11 +133,11 @@ export function KitchenScene({ onExit }: Props) {
     ? dailyBudgets.schoolLunch
     : (currentMeal ? dailyBudgets[currentMeal] : dailyBudgets.breakfast)
 
-  const mealTotalCost = currentParticipants.reduce((sum, m) => {
+  const mealTotalCost = currentPlateMembers.reduce((sum, m) => {
     const food = findFood(currentAssignments?.[m.id])
     return sum + (food?.cost ?? 0)
   }, 0)
-  const mealTotalMinutes = currentParticipants.reduce((sum, m) => {
+  const mealTotalMinutes = currentPlateMembers.reduce((sum, m) => {
     const food = findFood(currentAssignments?.[m.id])
     return sum + (food?.prepMinutes ?? 0)
   }, 0)
@@ -134,14 +149,11 @@ export function KitchenScene({ onExit }: Props) {
   const overBudget = totalCost > activeBudget.coins
   const overTime = totalMinutes > activeBudget.minutes
 
-  const allMealAssigned = currentConfig
-    ? currentParticipants.every(m => currentAssignments?.[m.id])
-    : false
-  const canServeMeal = allMealAssigned && !overBudget && !overTime
+  const allRequiredAssigned = currentRequiredMembers.every(m => currentAssignments?.[m.id])
+  const canServeMeal = allRequiredAssigned && !overBudget && !overTime
   const canPackSchoolLunch = schoolLunchFood !== null && !overBudget && !overTime
 
   // ---- transitions ----
-  // Entering planning preserves previous picks so player can tweak — only Serve commits.
   const startPlanning = (mealKey: MealKey) => {
     setState(MEAL_CONFIG[mealKey].planState)
     setSelectedFoodId(null)
@@ -172,7 +184,9 @@ export function KitchenScene({ onExit }: Props) {
 
   const onPlateClick = (memberId: string) => {
     if (selectedFoodId === null) return
-    if (isPlanningMeal && currentMeal && currentConfig?.participates(defaultFamily.find(m => m.id === memberId)!)) {
+    const member = defaultFamily.find(m => m.id === memberId)
+    if (!member) return
+    if (isPlanningMeal && currentMeal && currentConfig?.hasPlate(member)) {
       setMealAssignments(prev => ({
         ...prev,
         [currentMeal]: { ...prev[currentMeal], [memberId]: selectedFoodId },
@@ -183,7 +197,7 @@ export function KitchenScene({ onExit }: Props) {
     }
   }
 
-  // ---- speech bubble: show each member's LATEST eaten meal ----
+  // ---- speech bubbles: most recent eaten meal wins ----
   const speechFor = (memberId: string): { message?: string; tone?: MealTone } => {
     const member = defaultFamily.find(m => m.id === memberId)
     if (!member) return {}
@@ -200,20 +214,29 @@ export function KitchenScene({ onExit }: Props) {
         return { message: `For dinner: ${r.message}`, tone: r.tone }
       }
     }
-    if (memberId !== CHILD_ID && mealsServed.lunch) {
+
+    // Lunch — for child, home lunch wins over school lunch (same noon slot)
+    if (memberId === CHILD_ID) {
+      const homeLunch = mealsServed.lunch ? findFood(mealAssignments.lunch[CHILD_ID]) : undefined
+      if (homeLunch) {
+        const r = reactionFor(member, homeLunch)
+        return { message: `For lunch: ${r.message}`, tone: r.tone }
+      }
+      if (mealsServed.schoolLunch) {
+        const food = findFood(schoolLunchFood)
+        if (food) {
+          const r = reactionFor(member, food)
+          return { message: `For lunch: ${r.message}`, tone: r.tone }
+        }
+      }
+    } else if (mealsServed.lunch) {
       const food = findFood(mealAssignments.lunch[memberId])
       if (food) {
         const r = reactionFor(member, food)
         return { message: `For lunch: ${r.message}`, tone: r.tone }
       }
     }
-    if (memberId === CHILD_ID && mealsServed.schoolLunch) {
-      const food = findFood(schoolLunchFood)
-      if (food) {
-        const r = reactionFor(member, food)
-        return { message: `For lunch: ${r.message}`, tone: r.tone }
-      }
-    }
+
     if (mealsServed.breakfast) {
       const food = findFood(mealAssignments.breakfast[memberId])
       if (food) {
@@ -224,10 +247,13 @@ export function KitchenScene({ onExit }: Props) {
     return {}
   }
 
-  // ---- plates only visible during the current planning context ----
+  // ---- plates: visible only during the current planning context ----
   const plateFor = (memberId: string): Food | undefined | null => {
-    if (isPlanningMeal && currentMeal && currentConfig?.participates(defaultFamily.find(m => m.id === memberId)!)) {
-      return findFood(currentAssignments?.[memberId]) ?? null
+    if (isPlanningMeal && currentMeal && currentConfig) {
+      const member = defaultFamily.find(m => m.id === memberId)
+      if (member && currentConfig.hasPlate(member)) {
+        return findFood(currentAssignments?.[memberId]) ?? null
+      }
     }
     if (isPackingSchoolLunch && memberId === CHILD_ID) {
       return findFood(schoolLunchFood) ?? null
@@ -241,10 +267,15 @@ export function KitchenScene({ onExit }: Props) {
       if (overBudget && overTime) return `Over budget AND over time — swap for something cheaper and faster.`
       if (overBudget) return `Over budget — try cheaper picks.`
       if (overTime) return `Over time — try something faster.`
-      if (!allMealAssigned && selectedFoodId) return `Now tap a plate to serve it.`
-      if (!allMealAssigned) {
-        const remaining = currentParticipants.filter(m => !currentAssignments?.[m.id]).map(m => m.name).join(', ')
-        return `Pick a food, then tap a plate. Still to serve: ${remaining}.`
+      if (!allRequiredAssigned && selectedFoodId) return `Now tap a plate to serve it.`
+      if (!allRequiredAssigned) {
+        const remaining = currentRequiredMembers
+          .filter(m => !currentAssignments?.[m.id])
+          .map(m => m.name).join(', ')
+        const childNote = currentMeal === 'lunch' && !currentAssignments?.[CHILD_ID]
+          ? " Child's plate is optional — fill it if she's home for lunch instead of at school."
+          : ''
+        return `Pick a food, then tap a plate. Still to serve: ${remaining}.${childNote}`
       }
       return `Looks good — serve ${currentConfig.label} when ready.`
     }
@@ -293,20 +324,18 @@ export function KitchenScene({ onExit }: Props) {
     )
   }
 
-  // ---- show calorie strip once anything has been served ----
   const anythingServed = mealsServed.breakfast || mealsServed.schoolLunch || mealsServed.lunch || mealsServed.dinner
   const showCalories = anythingServed || state === 'end-of-day'
 
-  // ---- end-of-day reports ----
   const dayReports = state === 'end-of-day'
     ? defaultFamily.map(m => ({ member: m, report: computeDayEnergy(m, consumedFoodsFor(m.id)) }))
     : []
   const everyoneFed = dayReports.every(r => r.report.status === 'well-fed' || r.report.status === 'comfortable')
 
-  // ---- helpers for hub meal cards ----
+  // For hub meal cards: show the foods that were actually assigned and served.
   const mealCardEmojis = (mealKey: MealKey): string[] =>
     defaultFamily
-      .filter(MEAL_CONFIG[mealKey].participates)
+      .filter(MEAL_CONFIG[mealKey].hasPlate)
       .map(m => findFood(mealAssignments[mealKey][m.id])?.emoji)
       .filter((e): e is string => Boolean(e))
 
