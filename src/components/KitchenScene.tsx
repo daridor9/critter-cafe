@@ -161,10 +161,6 @@ export function KitchenScene({ onExit }: Props) {
     setState('hub')
     setSelectedFoodId(null)
   }
-  const cancel = () => {
-    setState('hub')
-    setSelectedFoodId(null)
-  }
   const goToEndOfDay = () => setState('end-of-day')
   const reset = () => {
     setState('hub')
@@ -317,7 +313,18 @@ export function KitchenScene({ onExit }: Props) {
   return (
     <main className="kitchen-scene">
       <header className="kitchen-header">
-        <div className="header-left">
+        <button
+          type="button"
+          className="back-button"
+          onClick={() => {
+            if (state === 'hub') onExit()
+            else { setState('hub'); setSelectedFoodId(null) }
+          }}
+          aria-label={state === 'hub' ? 'Back to title screen' : 'Back to kitchen'}
+        >
+          ← {state === 'hub' ? 'Title' : 'Kitchen'}
+        </button>
+        <div className="header-center">
           <span className="day-marker">{dayMarkerFor(state)}</span>
           <span className="kitchen-subtitle">Mediterranean Kitchen 🫒</span>
         </div>
@@ -419,9 +426,6 @@ export function KitchenScene({ onExit }: Props) {
                 🎒 Pack it
               </button>
             )}
-            <button type="button" className="secondary-action" onClick={cancel}>
-              ← Back to kitchen
-            </button>
           </div>
         </section>
       )}
@@ -453,10 +457,7 @@ export function KitchenScene({ onExit }: Props) {
               : "Even with breakfast, lunch, dinner, and a packed school lunch, single-item meals aren't enough fuel for most bodies. Combo meals (yogurt + bread + apple together on one plate) are the next step — coming soon."}
           </p>
           <div className="kitchen-actions">
-            <button type="button" className="primary-action" onClick={() => setState('hub')}>
-              ← Back to kitchen
-            </button>
-            <button type="button" className="secondary-action" onClick={reset}>
+            <button type="button" className="primary-action" onClick={reset}>
               🔄 Start the day over
             </button>
           </div>

@@ -15,17 +15,60 @@
 }
 
 .kitchen-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
+  gap: 12px;
   color: var(--text);
   font-size: 0.95rem;
 }
 
-.kitchen-header .header-left {
+.kitchen-header .header-center {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  text-align: center;
+  min-width: 0;
+}
+
+.kitchen-header .back-button {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-h);
+  font-family: inherit;
+  font-weight: 500;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.kitchen-header .back-button:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.kitchen-header .back-button:active {
+  transform: scale(0.97);
+}
+
+.kitchen-header .back-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .kitchen-header .back-button {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+@media (max-width: 540px) {
+  .kitchen-header .back-button {
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
 }
 
 .kitchen-header .day-marker {
