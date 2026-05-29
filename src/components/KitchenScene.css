@@ -396,6 +396,38 @@
   font-weight: 700;
 }
 
+.meal-totals {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: var(--text-h);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meal-totals-label {
+  font-style: italic;
+  color: var(--text);
+  opacity: 0.85;
+  font-size: 0.78rem;
+}
+
+.meal-totals-cal {
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .meal-totals {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .budget-bar {
     background: rgba(255, 255, 255, 0.05);

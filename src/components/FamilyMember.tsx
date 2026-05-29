@@ -3,6 +3,8 @@ import type { Food, MealTone } from '../food/types'
 import { SpeechBubble } from './SpeechBubble'
 import './FamilyMember.css'
 
+type Macros = { protein: number; carbs: number; fat: number }
+
 type Props = {
   member: FamilyMemberType
   speechDelayMs?: number
@@ -11,6 +13,8 @@ type Props = {
   assignedFood?: Food | null
   onPlateClick?: () => void
   caloriesConsumed?: number
+  macrosConsumed?: Macros
+  macroTargets?: Macros
 }
 
 export function FamilyMember({
@@ -21,10 +25,13 @@ export function FamilyMember({
   assignedFood,
   onPlateClick,
   caloriesConsumed,
+  macrosConsumed,
+  macroTargets,
 }: Props) {
   const message = speechMessage ?? member.morningGreeting
   const showPlate = assignedFood !== undefined
   const showCalories = caloriesConsumed !== undefined
+  const showMacros = macrosConsumed !== undefined && macroTargets !== undefined
   const target = member.profile.dailyCalories
   const ratio = showCalories ? caloriesConsumed / target : 0
   const energyClass = ratio >= 0.9 ? 'energy-good'
@@ -51,6 +58,16 @@ export function FamilyMember({
               style={{ width: `${Math.min(100, ratio * 100)}%` }}
             />
           </span>
+        </div>
+      )}
+      {showMacros && (
+        <div
+          className="macro-strip"
+          aria-label={`Protein ${macrosConsumed.protein} of ${macroTargets.protein} grams, carbs ${macrosConsumed.carbs} of ${macroTargets.carbs} grams, fat ${macrosConsumed.fat} of ${macroTargets.fat} grams.`}
+        >
+          <span className="macro-mini macro-protein">P {macrosConsumed.protein}/{macroTargets.protein}</span>
+          <span className="macro-mini macro-carbs">C {macrosConsumed.carbs}/{macroTargets.carbs}</span>
+          <span className="macro-mini macro-fat">F {macrosConsumed.fat}/{macroTargets.fat}</span>
         </div>
       )}
       {showPlate && (

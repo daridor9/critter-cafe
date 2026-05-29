@@ -123,6 +123,22 @@ export function KitchenScene({ onExit }: Props) {
   const caloriesFor = (memberId: string): number =>
     consumedFoodsFor(memberId).reduce((sum, f) => sum + f.calories, 0)
 
+  const macrosFor = (memberId: string) => {
+    const foods = consumedFoodsFor(memberId)
+    return {
+      protein: foods.reduce((s, f) => s + f.protein, 0),
+      carbs:   foods.reduce((s, f) => s + f.carbs,   0),
+      fat:     foods.reduce((s, f) => s + f.fat,     0),
+    }
+  }
+
+  const macroTargetsFor = (memberId: string) => {
+    const m = defaultFamily.find(x => x.id === memberId)
+    return m
+      ? { protein: m.profile.dailyProtein, carbs: m.profile.dailyCarbs, fat: m.profile.dailyFat }
+      : { protein: 0, carbs: 0, fat: 0 }
+  }
+
   // ---- current meal context ----
   const currentMeal = currentMealKey(state)
   const currentConfig = currentMeal ? MEAL_CONFIG[currentMeal] : null
@@ -153,6 +169,21 @@ export function KitchenScene({ onExit }: Props) {
   const totalMinutes = isPackingSchoolLunch ? schoolLunchMinutes : mealTotalMinutes
   const overBudget = totalCost > activeBudget.coins
   const overTime = totalMinutes > activeBudget.minutes
+
+  // ---- meal nutrition aggregates (what this meal delivers in total) ----
+  const sumAssignedFoodField = (field: 'calories' | 'protein' | 'carbs' | 'fat'): number => {
+    if (isPackingSchoolLunch) {
+      return findFood(schoolLunchFood)?.[field] ?? 0
+    }
+    return currentPlateMembers.reduce((sum, m) => {
+      const food = findFood(currentAssignments?.[m.id])
+      return sum + (food?.[field] ?? 0)
+    }, 0)
+  }
+  const mealCalories = sumAssignedFoodField('calories')
+  const mealProtein  = sumAssignedFoodField('protein')
+  const mealCarbs    = sumAssignedFoodField('carbs')
+  const mealFat      = sumAssignedFoodField('fat')
 
   const allRequiredAssigned = currentRequiredMembers.every(m => currentAssignments?.[m.id])
   const canServeMeal = allRequiredAssigned && !overBudget && !overTime
@@ -401,6 +432,8 @@ export function KitchenScene({ onExit }: Props) {
               assignedFood={plateFor(member.id)}
               onPlateClick={() => onPlateClick(member.id)}
               caloriesConsumed={showCalories ? caloriesFor(member.id) : undefined}
+              macrosConsumed={showCalories ? macrosFor(member.id) : undefined}
+              macroTargets={showCalories ? macroTargetsFor(member.id) : undefined}
             />
           )
         })}
@@ -466,6 +499,13 @@ export function KitchenScene({ onExit }: Props) {
             <span className="budget-label">
               {isPackingSchoolLunch ? '🎒 lunchbox' : `${currentConfig?.emoji} ${currentConfig?.label}`}
             </span>
+          </div>
+          <div className="meal-totals" aria-label="Meal nutrition totals">
+            <span className="meal-totals-label">Total this meal:</span>
+            <span className="meal-totals-cal">🔥 {mealCalories} cal</span>
+            <span className="macro-pill macro-protein">P {mealProtein}g</span>
+            <span className="macro-pill macro-carbs">C {mealCarbs}g</span>
+            <span className="macro-pill macro-fat">F {mealFat}g</span>
           </div>
           <p className="pantry-hint">{planningHint}</p>
           <div className="pantry-row">{defaultPantry.map(renderPantryItem)}</div>
