@@ -455,6 +455,13 @@ export function KitchenScene({ onExit }: Props) {
                 🎒 Pack it
               </button>
             )}
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() => { setState('hub'); setSelectedFoodId(null) }}
+            >
+              ← Back to kitchen
+            </button>
           </div>
         </section>
       )}
@@ -486,7 +493,10 @@ export function KitchenScene({ onExit }: Props) {
               : "Even with breakfast, lunch, dinner, and a packed school lunch, single-item meals aren't enough fuel for most bodies. Combo meals (yogurt + bread + apple together on one plate) are the next step — coming soon."}
           </p>
           <div className="kitchen-actions">
-            <button type="button" className="primary-action" onClick={reset}>
+            <button type="button" className="primary-action" onClick={() => setState('hub')}>
+              ← Back to kitchen
+            </button>
+            <button type="button" className="secondary-action" onClick={reset}>
               🔄 Start the day over
             </button>
           </div>
