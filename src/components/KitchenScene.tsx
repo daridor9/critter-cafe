@@ -329,13 +329,18 @@ export function KitchenScene({ onExit }: Props) {
         aria-pressed={isSelected}
         aria-label={itemDisabled
           ? `${food.name} — doesn't travel well, can't pack`
-          : `${food.name}, ${food.calories} calories, costs ${food.cost} coins, takes ${food.prepMinutes} minutes`}
+          : `${food.name}: ${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fat}g fat. Costs ${food.cost} coins, takes ${food.prepMinutes} minutes.`}
         title={itemDisabled ? "Doesn't travel well in a lunchbox" : undefined}
       >
         <span className="pantry-item-emoji" aria-hidden="true">{food.emoji}</span>
         <span className="pantry-item-name">{food.name}</span>
         <span className="pantry-item-meta" aria-hidden="true">
-          🔥 {food.calories} · 💰 {food.cost} · ⏱ {food.prepMinutes}m
+          🔥 {food.calories} cal · 💰 {food.cost} · ⏱ {food.prepMinutes}m
+        </span>
+        <span className="pantry-item-macros" aria-hidden="true">
+          <span className="macro-pill macro-protein">P {food.protein}g</span>
+          <span className="macro-pill macro-carbs">C {food.carbs}g</span>
+          <span className="macro-pill macro-fat">F {food.fat}g</span>
         </span>
       </button>
     )
@@ -499,6 +504,17 @@ export function KitchenScene({ onExit }: Props) {
                   <span>🔥 in <strong>{report.consumed}</strong> cal</span>
                   <span>💪 burned <strong>{report.burned}</strong> cal</span>
                   <span>🎯 needed <strong>{report.target}</strong></span>
+                  <span className="energy-row-macros">
+                    <span className={macroClass(report.macros.protein, report.macroTargets.protein)}>
+                      P <strong>{report.macros.protein}</strong> / {report.macroTargets.protein}g
+                    </span>
+                    <span className={macroClass(report.macros.carbs, report.macroTargets.carbs)}>
+                      C <strong>{report.macros.carbs}</strong> / {report.macroTargets.carbs}g
+                    </span>
+                    <span className={macroClass(report.macros.fat, report.macroTargets.fat)}>
+                      F <strong>{report.macros.fat}</strong> / {report.macroTargets.fat}g
+                    </span>
+                  </span>
                   <span className="energy-row-bmr">
                     metabolism ~{member.profile.bmrPerHour} cal/hr + activity {member.profile.activityCalories}
                   </span>
@@ -650,6 +666,14 @@ function BudgetStepper({ icon, unit, value, onDec, onInc, canDec, canInc }: Budg
       <span className="budget-stepper-unit">{unit}</span>
     </div>
   )
+}
+
+function macroClass(actual: number, target: number): string {
+  const ratio = target > 0 ? actual / target : 0
+  if (ratio >= 0.9) return 'macro-pill macro-good'
+  if (ratio >= 0.5) return 'macro-pill macro-okay'
+  if (ratio >= 0.2) return 'macro-pill macro-low'
+  return 'macro-pill macro-empty'
 }
 
 function dayMarkerFor(state: KitchenState): string {

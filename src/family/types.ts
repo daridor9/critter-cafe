@@ -5,7 +5,10 @@ export type BiologicalProfile = {
   dailyCalories: number      // target intake (cal/day)
   bmrPerHour: number          // basal metabolic rate at rest (cal/hour)
   activityCalories: number    // typical extra cal/day from sustained activity
-                              // (school for the child, work for the adult, etc.)
+  // Macro targets per day (grams). Real-world rounded values.
+  dailyProtein: number
+  dailyCarbs: number
+  dailyFat: number
 }
 
 export type FamilyMember = {

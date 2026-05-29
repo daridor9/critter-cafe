@@ -3,24 +3,33 @@ import type { Food, MealTone } from '../food/types'
 
 export type EnergyStatus = 'well-fed' | 'comfortable' | 'hungry' | 'starving'
 
+export type Macros = { protein: number; carbs: number; fat: number }
+
 export type EnergyReport = {
   consumed: number      // calories eaten today
-  burned: number        // calories burned today (BMR * hours + activity)
+  burned: number        // calories burned today (BMR * 24h + activity)
   target: number        // daily calorie need
   net: number           // consumed - burned (negative = deficit)
   ratioOfTarget: number // consumed / target
   status: EnergyStatus
   tone: MealTone        // maps to SpeechBubble tone
   verdict: string       // bedtime message tied to status
+  macros: Macros        // grams eaten today
+  macroTargets: Macros  // grams needed today
 }
 
-/**
- * Compute a character's energy report for the whole day.
- * For MVP we assume a full 24-hour burn (BMR * 24h + their typical activity)
- * so the end-of-day verdict shows what their body needed vs. what we fed it.
- */
 export function computeDayEnergy(member: FamilyMember, consumedFoods: Food[]): EnergyReport {
   const consumed = consumedFoods.reduce((sum, f) => sum + f.calories, 0)
+  const macros: Macros = {
+    protein: consumedFoods.reduce((s, f) => s + f.protein, 0),
+    carbs:   consumedFoods.reduce((s, f) => s + f.carbs,   0),
+    fat:     consumedFoods.reduce((s, f) => s + f.fat,     0),
+  }
+  const macroTargets: Macros = {
+    protein: member.profile.dailyProtein,
+    carbs:   member.profile.dailyCarbs,
+    fat:     member.profile.dailyFat,
+  }
   const bmrBurn = member.profile.bmrPerHour * 24
   const activityBurn = member.profile.activityCalories
   const burned = bmrBurn + activityBurn
@@ -30,7 +39,7 @@ export function computeDayEnergy(member: FamilyMember, consumedFoods: Food[]): E
 
   const { status, tone, verdict } = classify(ratioOfTarget, member.name)
 
-  return { consumed, burned, target, net, ratioOfTarget, status, tone, verdict }
+  return { consumed, burned, target, net, ratioOfTarget, status, tone, verdict, macros, macroTargets }
 }
 
 function classify(ratio: number, name: string): { status: EnergyStatus; tone: MealTone; verdict: string } {

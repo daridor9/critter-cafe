@@ -11,9 +11,12 @@ export type Food = {
   id: string
   name: string
   emoji: string
-  cost: number         // in coins (simple abstract currency)
+  cost: number         // in coins
   prepMinutes: number  // active hands-on prep time
-  packable: boolean    // does it survive in a lunchbox until noon?
-  calories: number     // per serving — real-world rounded values
+  packable: boolean    // survives in a lunchbox?
+  calories: number     // per serving
+  protein: number      // grams per serving
+  carbs: number        // grams per serving
+  fat: number          // grams per serving
   reactions: Record<LifeStage, MealReaction>
 }
