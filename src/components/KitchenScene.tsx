@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { defaultFamily } from '../family/defaultFamily'
 import { defaultPantry } from '../food/pantry'
-import { dailyBudgets } from '../food/budget'
+import { DEFAULT_BUDGETS, BUDGET_LIMITS, type MealBudget, type MealKey as BudgetKey } from '../food/budget'
 import { computeDayEnergy } from '../family/energy'
 import type { FamilyMember } from '../family/types'
 import type { Food, MealReaction, MealTone } from '../food/types'
@@ -22,6 +22,7 @@ type KitchenState =
   | 'planning-lunch'
   | 'planning-dinner'
   | 'end-of-day'
+  | 'budgets'
 
 const CHILD_ID = 'child'
 
@@ -30,8 +31,8 @@ type MealConfig = {
   label: string
   emoji: string
   planState: KitchenState
-  hasPlate: (m: FamilyMember) => boolean    // who shows a plate (can be assigned)
-  isRequired: (m: FamilyMember) => boolean  // who MUST be assigned to enable Serve
+  hasPlate: (m: FamilyMember) => boolean
+  isRequired: (m: FamilyMember) => boolean
   serveLabel: string
 }
 
@@ -46,8 +47,8 @@ const MEAL_CONFIG: Record<MealKey, MealConfig> = {
   lunch: {
     key: 'lunch', label: 'lunch', emoji: '🥗',
     planState: 'planning-lunch',
-    hasPlate: () => true,                      // child has an optional plate at home lunch
-    isRequired: (m) => m.id !== CHILD_ID,      // but only baby + adult + elder are required
+    hasPlate: () => true,
+    isRequired: (m) => m.id !== CHILD_ID,
     serveLabel: '🥗 Serve lunch',
   },
   dinner: {
@@ -57,6 +58,13 @@ const MEAL_CONFIG: Record<MealKey, MealConfig> = {
     isRequired: () => true,
     serveLabel: '🍝 Serve dinner',
   },
+}
+
+const BUDGET_LABELS: Record<BudgetKey, { emoji: string; label: string }> = {
+  breakfast:   { emoji: '🍳', label: 'Breakfast' },
+  schoolLunch: { emoji: '🎒', label: 'School lunch' },
+  lunch:       { emoji: '🥗', label: 'Lunch at home' },
+  dinner:      { emoji: '🍝', label: 'Dinner' },
 }
 
 function currentMealKey(state: KitchenState): MealKey | null {
@@ -79,21 +87,20 @@ export function KitchenScene({ onExit }: Props) {
   const [mealsServed, setMealsServed] = useState<Record<ServedKey, boolean>>({
     breakfast: false, schoolLunch: false, lunch: false, dinner: false,
   })
+  // Player-adjustable budgets, initialized from defaults. Survives across
+  // meal planning within a session; reset by ⚙ Adjust budgets → Reset.
+  const [budgets, setBudgets] = useState<Record<BudgetKey, MealBudget>>(DEFAULT_BUDGETS)
 
   const findFood = (id: string | null | undefined): Food | undefined =>
     id ? defaultPantry.find(f => f.id === id) : undefined
 
   // ---- per-character consumed foods ----
-  // Child special-case: home lunch and school lunch are mutually exclusive (same noon).
-  // If child has a home-lunch assignment, that's what she ate; otherwise the packed lunch.
   const consumedFoodsFor = (memberId: string): Food[] => {
     const foods: Food[] = []
-
     if (mealsServed.breakfast) {
       const f = findFood(mealAssignments.breakfast[memberId])
       if (f) foods.push(f)
     }
-
     if (memberId === CHILD_ID) {
       const homeLunch = mealsServed.lunch ? findFood(mealAssignments.lunch[CHILD_ID]) : undefined
       if (homeLunch) {
@@ -106,12 +113,10 @@ export function KitchenScene({ onExit }: Props) {
       const f = findFood(mealAssignments.lunch[memberId])
       if (f) foods.push(f)
     }
-
     if (mealsServed.dinner) {
       const f = findFood(mealAssignments.dinner[memberId])
       if (f) foods.push(f)
     }
-
     return foods
   }
 
@@ -128,10 +133,10 @@ export function KitchenScene({ onExit }: Props) {
   const isPlanningMeal = currentMeal !== null
   const isPackingSchoolLunch = state === 'packing-school-lunch'
 
-  // ---- budget logic ----
+  // ---- active budget ----
   const activeBudget = isPackingSchoolLunch
-    ? dailyBudgets.schoolLunch
-    : (currentMeal ? dailyBudgets[currentMeal] : dailyBudgets.breakfast)
+    ? budgets.schoolLunch
+    : (currentMeal ? budgets[currentMeal] : budgets.breakfast)
 
   const mealTotalCost = currentPlateMembers.reduce((sum, m) => {
     const food = findFood(currentAssignments?.[m.id])
@@ -197,7 +202,20 @@ export function KitchenScene({ onExit }: Props) {
     }
   }
 
-  // ---- speech bubbles: most recent eaten meal wins ----
+  // ---- budget adjustment ----
+  const updateBudget = (key: BudgetKey, field: 'coins' | 'minutes', delta: number) => {
+    const limits = BUDGET_LIMITS[field]
+    setBudgets(prev => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: Math.max(limits.min, Math.min(limits.max, prev[key][field] + delta)),
+      },
+    }))
+  }
+  const resetBudgets = () => setBudgets(DEFAULT_BUDGETS)
+
+  // ---- speech bubble logic ----
   const speechFor = (memberId: string): { message?: string; tone?: MealTone } => {
     const member = defaultFamily.find(m => m.id === memberId)
     if (!member) return {}
@@ -215,7 +233,6 @@ export function KitchenScene({ onExit }: Props) {
       }
     }
 
-    // Lunch — for child, home lunch wins over school lunch (same noon slot)
     if (memberId === CHILD_ID) {
       const homeLunch = mealsServed.lunch ? findFood(mealAssignments.lunch[CHILD_ID]) : undefined
       if (homeLunch) {
@@ -247,7 +264,7 @@ export function KitchenScene({ onExit }: Props) {
     return {}
   }
 
-  // ---- plates: visible only during the current planning context ----
+  // ---- plate logic ----
   const plateFor = (memberId: string): Food | undefined | null => {
     if (isPlanningMeal && currentMeal && currentConfig) {
       const member = defaultFamily.find(m => m.id === memberId)
@@ -264,9 +281,9 @@ export function KitchenScene({ onExit }: Props) {
   // ---- planning hint ----
   const planningHint = (() => {
     if (isPlanningMeal && currentConfig) {
-      if (overBudget && overTime) return `Over budget AND over time — swap for something cheaper and faster.`
-      if (overBudget) return `Over budget — try cheaper picks.`
-      if (overTime) return `Over time — try something faster.`
+      if (overBudget && overTime) return `Over budget AND over time — swap for cheaper/faster, or raise the budget in ⚙ settings.`
+      if (overBudget) return `Over budget — try cheaper picks, or raise it in ⚙ settings.`
+      if (overTime) return `Over time — try faster picks, or raise it in ⚙ settings.`
       if (!allRequiredAssigned && selectedFoodId) return `Now tap a plate to serve it.`
       if (!allRequiredAssigned) {
         const remaining = currentRequiredMembers
@@ -332,7 +349,6 @@ export function KitchenScene({ onExit }: Props) {
     : []
   const everyoneFed = dayReports.every(r => r.report.status === 'well-fed' || r.report.status === 'comfortable')
 
-  // For hub meal cards: show the foods that were actually assigned and served.
   const mealCardEmojis = (mealKey: MealKey): string[] =>
     defaultFamily
       .filter(MEAL_CONFIG[mealKey].hasPlate)
@@ -424,6 +440,9 @@ export function KitchenScene({ onExit }: Props) {
             <button type="button" className="primary-action" onClick={goToEndOfDay}>
               🌙 See end of day
             </button>
+            <button type="button" className="secondary-action" onClick={() => setState('budgets')}>
+              ⚙ Adjust budgets
+            </button>
             {anythingServed && (
               <button type="button" className="secondary-action" onClick={reset}>
                 🔄 Reset the day
@@ -503,12 +522,63 @@ export function KitchenScene({ onExit }: Props) {
         </section>
       )}
 
+      {state === 'budgets' && (
+        <section className="budget-settings" aria-label="Budget settings">
+          <h2 className="budget-settings-title">⚙ Adjust your daily budgets</h2>
+          <p className="budget-settings-hint">
+            Set how much money and time you have for each meal. Bigger budget = more freedom; tighter budget = harder puzzle.
+          </p>
+          <ul className="budget-list">
+            {(['breakfast', 'schoolLunch', 'lunch', 'dinner'] as const).map(key => {
+              const cfg = BUDGET_LABELS[key]
+              const b = budgets[key]
+              return (
+                <li key={key} className="budget-row">
+                  <span className="budget-meal-label">
+                    <span aria-hidden="true">{cfg.emoji}</span> {cfg.label}
+                  </span>
+                  <BudgetStepper
+                    icon="💰"
+                    unit="coins"
+                    value={b.coins}
+                    onDec={() => updateBudget(key, 'coins', -BUDGET_LIMITS.coins.step)}
+                    onInc={() => updateBudget(key, 'coins',  BUDGET_LIMITS.coins.step)}
+                    canDec={b.coins > BUDGET_LIMITS.coins.min}
+                    canInc={b.coins < BUDGET_LIMITS.coins.max}
+                  />
+                  <BudgetStepper
+                    icon="⏱"
+                    unit="min"
+                    value={b.minutes}
+                    onDec={() => updateBudget(key, 'minutes', -BUDGET_LIMITS.minutes.step)}
+                    onInc={() => updateBudget(key, 'minutes',  BUDGET_LIMITS.minutes.step)}
+                    canDec={b.minutes > BUDGET_LIMITS.minutes.min}
+                    canInc={b.minutes < BUDGET_LIMITS.minutes.max}
+                  />
+                </li>
+              )
+            })}
+          </ul>
+          <div className="kitchen-actions">
+            <button type="button" className="primary-action" onClick={() => setState('hub')}>
+              ← Back to kitchen
+            </button>
+            <button type="button" className="secondary-action" onClick={resetBudgets}>
+              🔄 Reset to defaults
+            </button>
+          </div>
+        </section>
+      )}
+
       <footer className="kitchen-footer">
         {state === 'hub' && (
           <p><em>Pick any meal to plan or replan. Order doesn't matter — go to end-of-day anytime to see how the day balanced out.</em></p>
         )}
         {(isPlanningMeal || isPackingSchoolLunch) && (
           <p><em>Green = ideal · yellow = okay · orange or red = wrong fit.</em></p>
+        )}
+        {state === 'budgets' && (
+          <p><em>Tighter budgets teach the time-cost-nutrition tradeoff harder. Looser budgets let you experiment freely.</em></p>
         )}
       </footer>
     </main>
@@ -544,6 +614,44 @@ function MealCard({ emoji, name, served, foodEmojis, onClick }: MealCardProps) {
   )
 }
 
+type BudgetStepperProps = {
+  icon: string
+  unit: string
+  value: number
+  onDec: () => void
+  onInc: () => void
+  canDec: boolean
+  canInc: boolean
+}
+
+function BudgetStepper({ icon, unit, value, onDec, onInc, canDec, canInc }: BudgetStepperProps) {
+  return (
+    <div className="budget-stepper">
+      <span className="budget-stepper-icon" aria-hidden="true">{icon}</span>
+      <button
+        type="button"
+        className="budget-stepper-button"
+        onClick={onDec}
+        disabled={!canDec}
+        aria-label={`Decrease ${unit}`}
+      >
+        −
+      </button>
+      <span className="budget-stepper-value">{value}</span>
+      <button
+        type="button"
+        className="budget-stepper-button"
+        onClick={onInc}
+        disabled={!canInc}
+        aria-label={`Increase ${unit}`}
+      >
+        +
+      </button>
+      <span className="budget-stepper-unit">{unit}</span>
+    </div>
+  )
+}
+
 function dayMarkerFor(state: KitchenState): string {
   if (state === 'hub') return '☀ Day 1 — Kitchen'
   if (state === 'planning-breakfast') return '🍳 Breakfast'
@@ -551,5 +659,6 @@ function dayMarkerFor(state: KitchenState): string {
   if (state === 'planning-lunch') return '🥗 Midday lunch'
   if (state === 'planning-dinner') return '🍝 Dinner'
   if (state === 'end-of-day') return '🌙 Bedtime'
+  if (state === 'budgets') return '⚙ Budgets'
   return '☀ Day 1'
 }
