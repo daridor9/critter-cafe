@@ -10,7 +10,11 @@ type Props = {
   speechDelayMs?: number
   speechMessage?: string
   speechTone?: MealTone
-  assignedFood?: Food | null
+  // Combo meals: a plate can hold 0+ foods.
+  //   undefined → no plate (member not in current planning context)
+  //   []        → empty plate
+  //   [...]     → filled plate
+  assignedFoods?: Food[]
   onPlateClick?: () => void
   caloriesConsumed?: number
   macrosConsumed?: Macros
@@ -22,14 +26,15 @@ export function FamilyMember({
   speechDelayMs = 0,
   speechMessage,
   speechTone,
-  assignedFood,
+  assignedFoods,
   onPlateClick,
   caloriesConsumed,
   macrosConsumed,
   macroTargets,
 }: Props) {
   const message = speechMessage ?? member.morningGreeting
-  const showPlate = assignedFood !== undefined
+  const showPlate = assignedFoods !== undefined
+  const filled = (assignedFoods?.length ?? 0) > 0
   const showCalories = caloriesConsumed !== undefined
   const showMacros = macrosConsumed !== undefined && macroTargets !== undefined
   const target = member.profile.dailyCalories
@@ -73,15 +78,23 @@ export function FamilyMember({
       {showPlate && (
         <button
           type="button"
-          className={`plate ${assignedFood ? 'plate-filled' : 'plate-empty'}`}
+          className={`plate ${filled ? 'plate-filled' : 'plate-empty'}`}
           onClick={onPlateClick}
           aria-label={
-            assignedFood
-              ? `${member.name}'s plate: ${assignedFood.name}. Tap to change.`
+            filled
+              ? `${member.name}'s plate has ${assignedFoods!.map(f => f.name).join(', ')}. Tap a food to add or remove.`
               : `${member.name}'s plate: empty. Pick a food first, then tap to assign.`
           }
         >
-          {assignedFood ? assignedFood.emoji : '+'}
+          {filled ? (
+            <span className={`plate-foods plate-foods-${Math.min(5, assignedFoods!.length)}`}>
+              {assignedFoods!.map((f, i) => (
+                <span key={`${f.id}-${i}`} className="plate-food" title={f.name}>{f.emoji}</span>
+              ))}
+            </span>
+          ) : (
+            <span className="plate-empty-mark">+</span>
+          )}
         </button>
       )}
     </div>

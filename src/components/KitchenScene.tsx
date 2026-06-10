@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { defaultFamily } from '../family/defaultFamily'
 import { defaultPantry } from '../food/pantry'
 import { DEFAULT_BUDGETS, BUDGET_LIMITS, type MealBudget, type MealKey as BudgetKey } from '../food/budget'
@@ -12,7 +12,7 @@ type Props = {
   onExit: () => void
 }
 
-type MealKey = 'breakfast' | 'lunch' | 'dinner'
+type MealKey = 'breakfast' | 'lunch' | 'snack' | 'dinner'
 type ServedKey = MealKey | 'schoolLunch'
 
 type KitchenState =
@@ -20,9 +20,12 @@ type KitchenState =
   | 'planning-breakfast'
   | 'packing-school-lunch'
   | 'planning-lunch'
+  | 'planning-snack'
   | 'planning-dinner'
   | 'end-of-day'
   | 'budgets'
+  | 'family-settings'
+  | 'tutorial'
 
 const CHILD_ID = 'child'
 
@@ -51,6 +54,13 @@ const MEAL_CONFIG: Record<MealKey, MealConfig> = {
     isRequired: (m) => m.id !== CHILD_ID,
     serveLabel: '🥗 Serve lunch',
   },
+  snack: {
+    key: 'snack', label: 'snack', emoji: '🍪',
+    planState: 'planning-snack',
+    hasPlate: () => true,
+    isRequired: () => false,  // snacks are entirely optional per person
+    serveLabel: '🍪 Serve snack',
+  },
   dinner: {
     key: 'dinner', label: 'dinner', emoji: '🍝',
     planState: 'planning-dinner',
@@ -64,6 +74,7 @@ const BUDGET_LABELS: Record<BudgetKey, { emoji: string; label: string }> = {
   breakfast:   { emoji: '🍳', label: 'Breakfast' },
   schoolLunch: { emoji: '🎒', label: 'School lunch' },
   lunch:       { emoji: '🥗', label: 'Lunch at home' },
+  snack:       { emoji: '🍪', label: 'Snack' },
   dinner:      { emoji: '🍝', label: 'Dinner' },
 }
 
@@ -77,52 +88,115 @@ function currentMealKey(state: KitchenState): MealKey | null {
 const reactionFor = (member: FamilyMember, food: Food): MealReaction =>
   food.reactions[member.profile.lifeStage]
 
+const TONE_ORDER: MealTone[] = ['bad', 'poor', 'okay', 'ideal']
+const worstTone = (tones: MealTone[]): MealTone => {
+  for (const t of TONE_ORDER) if (tones.includes(t)) return t
+  return 'ideal'
+}
+const COMBO_TONE_MESSAGE: Record<MealTone, string> = {
+  ideal: 'Yum! Great plate.',
+  okay:  'Decent combo.',
+  poor:  'Not the right mix for me.',
+  bad:   "There's something here I can't eat!",
+}
+
+function plateReaction(member: FamilyMember, foods: Food[]): MealReaction | null {
+  if (foods.length === 0) return null
+  if (foods.length === 1) return reactionFor(member, foods[0])
+  const reactions = foods.map(f => reactionFor(member, f))
+  const tone = worstTone(reactions.map(r => r.tone))
+  const emojis = foods.map(f => f.emoji).join(' ')
+  return { tone, message: `${emojis} — ${COMBO_TONE_MESSAGE[tone]}` }
+}
+
+// ===== persistence =====
+const STORAGE_KEY = 'critter-cafe-state'
+const STORAGE_VERSION = 2
+
+type Plate = string[]  // array of food IDs
+type MealAssignmentsMap = Record<MealKey, Record<string, Plate>>
+
+type SavedState = {
+  version: number
+  mealAssignments: MealAssignmentsMap
+  schoolLunchFood: Plate
+  mealsServed: Record<ServedKey, boolean>
+  budgets: Record<BudgetKey, MealBudget>
+  family: FamilyMember[]
+  tutorialSeen: boolean
+}
+
+const emptyMealAssignments = (): MealAssignmentsMap => ({
+  breakfast: {}, lunch: {}, snack: {}, dinner: {},
+})
+
+const initialServed = (): Record<ServedKey, boolean> => ({
+  breakfast: false, schoolLunch: false, lunch: false, snack: false, dinner: false,
+})
+
+function loadSaved(): Partial<SavedState> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as SavedState
+    if (parsed.version !== STORAGE_VERSION) return {}
+    return parsed
+  } catch {
+    return {}
+  }
+}
+
 export function KitchenScene({ onExit }: Props) {
-  const [state, setState] = useState<KitchenState>('hub')
+  const saved = loadSaved()
+
+  const [state, setState] = useState<KitchenState>(saved.tutorialSeen ? 'hub' : 'tutorial')
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null)
-  const [mealAssignments, setMealAssignments] = useState<Record<MealKey, Record<string, string | null>>>({
-    breakfast: {}, lunch: {}, dinner: {},
-  })
-  const [schoolLunchFood, setSchoolLunchFood] = useState<string | null>(null)
-  const [mealsServed, setMealsServed] = useState<Record<ServedKey, boolean>>({
-    breakfast: false, schoolLunch: false, lunch: false, dinner: false,
-  })
-  // Player-adjustable budgets, initialized from defaults. Survives across
-  // meal planning within a session; reset by ⚙ Adjust budgets → Reset.
-  const [budgets, setBudgets] = useState<Record<BudgetKey, MealBudget>>(DEFAULT_BUDGETS)
+  const [mealAssignments, setMealAssignments] = useState<MealAssignmentsMap>(
+    saved.mealAssignments ?? emptyMealAssignments()
+  )
+  const [schoolLunchFood, setSchoolLunchFood] = useState<Plate>(saved.schoolLunchFood ?? [])
+  const [mealsServed, setMealsServed] = useState<Record<ServedKey, boolean>>(saved.mealsServed ?? initialServed())
+  const [budgets, setBudgets] = useState<Record<BudgetKey, MealBudget>>(saved.budgets ?? DEFAULT_BUDGETS)
+  const [family, setFamily] = useState<FamilyMember[]>(saved.family ?? defaultFamily)
+  const [tutorialSeen, setTutorialSeen] = useState<boolean>(saved.tutorialSeen ?? false)
+  const [tutorialStep, setTutorialStep] = useState(0)
+
+  // ---- persist all relevant state to localStorage ----
+  useEffect(() => {
+    const data: SavedState = {
+      version: STORAGE_VERSION,
+      mealAssignments, schoolLunchFood, mealsServed, budgets, family, tutorialSeen,
+    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch {}
+  }, [mealAssignments, schoolLunchFood, mealsServed, budgets, family, tutorialSeen])
 
   const findFood = (id: string | null | undefined): Food | undefined =>
     id ? defaultPantry.find(f => f.id === id) : undefined
 
-  // ---- per-character consumed foods ----
+  const foodsOnPlate = (mealKey: MealKey, memberId: string): Food[] => {
+    const ids = mealAssignments[mealKey]?.[memberId] ?? []
+    return ids.map(findFood).filter((f): f is Food => Boolean(f))
+  }
+  const schoolLunchFoods = (): Food[] =>
+    schoolLunchFood.map(findFood).filter((f): f is Food => Boolean(f))
+
+  // ---- per-character consumed foods (whole day) ----
   const consumedFoodsFor = (memberId: string): Food[] => {
     const foods: Food[] = []
-    if (mealsServed.breakfast) {
-      const f = findFood(mealAssignments.breakfast[memberId])
-      if (f) foods.push(f)
-    }
+    if (mealsServed.breakfast) foods.push(...foodsOnPlate('breakfast', memberId))
     if (memberId === CHILD_ID) {
-      const homeLunch = mealsServed.lunch ? findFood(mealAssignments.lunch[CHILD_ID]) : undefined
-      if (homeLunch) {
-        foods.push(homeLunch)
-      } else if (mealsServed.schoolLunch) {
-        const f = findFood(schoolLunchFood)
-        if (f) foods.push(f)
-      }
+      const homeLunch = mealsServed.lunch ? foodsOnPlate('lunch', CHILD_ID) : []
+      if (homeLunch.length > 0) foods.push(...homeLunch)
+      else if (mealsServed.schoolLunch) foods.push(...schoolLunchFoods())
     } else if (mealsServed.lunch) {
-      const f = findFood(mealAssignments.lunch[memberId])
-      if (f) foods.push(f)
+      foods.push(...foodsOnPlate('lunch', memberId))
     }
-    if (mealsServed.dinner) {
-      const f = findFood(mealAssignments.dinner[memberId])
-      if (f) foods.push(f)
-    }
+    if (mealsServed.snack) foods.push(...foodsOnPlate('snack', memberId))
+    if (mealsServed.dinner) foods.push(...foodsOnPlate('dinner', memberId))
     return foods
   }
-
   const caloriesFor = (memberId: string): number =>
     consumedFoodsFor(memberId).reduce((sum, f) => sum + f.calories, 0)
-
   const macrosFor = (memberId: string) => {
     const foods = consumedFoodsFor(memberId)
     return {
@@ -131,63 +205,61 @@ export function KitchenScene({ onExit }: Props) {
       fat:     foods.reduce((s, f) => s + f.fat,     0),
     }
   }
-
   const macroTargetsFor = (memberId: string) => {
-    const m = defaultFamily.find(x => x.id === memberId)
+    const m = family.find(x => x.id === memberId)
     return m
       ? { protein: m.profile.dailyProtein, carbs: m.profile.dailyCarbs, fat: m.profile.dailyFat }
       : { protein: 0, carbs: 0, fat: 0 }
   }
 
-  // ---- current meal context ----
+  // ---- current planning context ----
   const currentMeal = currentMealKey(state)
   const currentConfig = currentMeal ? MEAL_CONFIG[currentMeal] : null
-  const currentAssignments = currentMeal ? mealAssignments[currentMeal] : null
-  const currentPlateMembers = currentConfig ? defaultFamily.filter(currentConfig.hasPlate) : []
-  const currentRequiredMembers = currentConfig ? defaultFamily.filter(currentConfig.isRequired) : []
+  const currentPlateMembers = currentConfig ? family.filter(currentConfig.hasPlate) : []
+  const currentRequiredMembers = currentConfig ? family.filter(currentConfig.isRequired) : []
 
   const isPlanningMeal = currentMeal !== null
   const isPackingSchoolLunch = state === 'packing-school-lunch'
 
-  // ---- active budget ----
   const activeBudget = isPackingSchoolLunch
     ? budgets.schoolLunch
     : (currentMeal ? budgets[currentMeal] : budgets.breakfast)
 
-  const mealTotalCost = currentPlateMembers.reduce((sum, m) => {
-    const food = findFood(currentAssignments?.[m.id])
-    return sum + (food?.cost ?? 0)
-  }, 0)
-  const mealTotalMinutes = currentPlateMembers.reduce((sum, m) => {
-    const food = findFood(currentAssignments?.[m.id])
-    return sum + (food?.prepMinutes ?? 0)
-  }, 0)
-  const schoolLunchCost = findFood(schoolLunchFood)?.cost ?? 0
-  const schoolLunchMinutes = findFood(schoolLunchFood)?.prepMinutes ?? 0
+  // ---- per-meal aggregation helper ----
+  const sumPlateField = (foods: Food[], field: 'cost' | 'prepMinutes' | 'calories' | 'protein' | 'carbs' | 'fat'): number =>
+    foods.reduce((s, f) => s + (f[field] ?? 0), 0)
 
-  const totalCost = isPackingSchoolLunch ? schoolLunchCost : mealTotalCost
-  const totalMinutes = isPackingSchoolLunch ? schoolLunchMinutes : mealTotalMinutes
+  const mealTotalCost = currentPlateMembers.reduce((sum, m) => sum + sumPlateField(foodsOnPlate(currentMeal!, m.id), 'cost'), 0)
+  const mealTotalMinutes = currentPlateMembers.reduce((sum, m) => sum + sumPlateField(foodsOnPlate(currentMeal!, m.id), 'prepMinutes'), 0)
+  const schoolLunchCost = sumPlateField(schoolLunchFoods(), 'cost')
+  const schoolLunchMinutes = sumPlateField(schoolLunchFoods(), 'prepMinutes')
+
+  const totalCost = isPackingSchoolLunch ? schoolLunchCost : (currentMeal ? mealTotalCost : 0)
+  const totalMinutes = isPackingSchoolLunch ? schoolLunchMinutes : (currentMeal ? mealTotalMinutes : 0)
   const overBudget = totalCost > activeBudget.coins
   const overTime = totalMinutes > activeBudget.minutes
 
-  // ---- meal nutrition aggregates (what this meal delivers in total) ----
-  const sumAssignedFoodField = (field: 'calories' | 'protein' | 'carbs' | 'fat'): number => {
-    if (isPackingSchoolLunch) {
-      return findFood(schoolLunchFood)?.[field] ?? 0
-    }
-    return currentPlateMembers.reduce((sum, m) => {
-      const food = findFood(currentAssignments?.[m.id])
-      return sum + (food?.[field] ?? 0)
-    }, 0)
+  const sumAllPlatesField = (field: 'calories' | 'protein' | 'carbs' | 'fat'): number => {
+    if (isPackingSchoolLunch) return sumPlateField(schoolLunchFoods(), field)
+    if (!currentMeal) return 0
+    return currentPlateMembers.reduce((sum, m) => sum + sumPlateField(foodsOnPlate(currentMeal, m.id), field), 0)
   }
-  const mealCalories = sumAssignedFoodField('calories')
-  const mealProtein  = sumAssignedFoodField('protein')
-  const mealCarbs    = sumAssignedFoodField('carbs')
-  const mealFat      = sumAssignedFoodField('fat')
+  const mealCalories = sumAllPlatesField('calories')
+  const mealProtein  = sumAllPlatesField('protein')
+  const mealCarbs    = sumAllPlatesField('carbs')
+  const mealFat      = sumAllPlatesField('fat')
 
-  const allRequiredAssigned = currentRequiredMembers.every(m => currentAssignments?.[m.id])
-  const canServeMeal = allRequiredAssigned && !overBudget && !overTime
-  const canPackSchoolLunch = schoolLunchFood !== null && !overBudget && !overTime
+  const allRequiredAssigned = currentRequiredMembers.every(m => (mealAssignments[currentMeal!]?.[m.id]?.length ?? 0) > 0)
+  // For "snack" (no required members), allow serving if at least one plate has food, OR allow empty serve.
+  // We require at least one food on the meal for it to count as served.
+  const anyPlateFilled = currentMeal
+    ? currentPlateMembers.some(m => (mealAssignments[currentMeal]?.[m.id]?.length ?? 0) > 0)
+    : false
+  const canServeMeal = (currentConfig?.key === 'snack'
+    ? anyPlateFilled
+    : allRequiredAssigned
+  ) && !overBudget && !overTime
+  const canPackSchoolLunch = schoolLunchFood.length > 0 && !overBudget && !overTime
 
   // ---- transitions ----
   const startPlanning = (mealKey: MealKey) => {
@@ -212,24 +284,34 @@ export function KitchenScene({ onExit }: Props) {
   const goToEndOfDay = () => setState('end-of-day')
   const reset = () => {
     setState('hub')
-    setMealAssignments({ breakfast: {}, lunch: {}, dinner: {} })
-    setSchoolLunchFood(null)
-    setMealsServed({ breakfast: false, schoolLunch: false, lunch: false, dinner: false })
+    setMealAssignments(emptyMealAssignments())
+    setSchoolLunchFood([])
+    setMealsServed(initialServed())
     setSelectedFoodId(null)
   }
 
   const onPlateClick = (memberId: string) => {
     if (selectedFoodId === null) return
-    const member = defaultFamily.find(m => m.id === memberId)
+    const member = family.find(m => m.id === memberId)
     if (!member) return
     if (isPlanningMeal && currentMeal && currentConfig?.hasPlate(member)) {
-      setMealAssignments(prev => ({
-        ...prev,
-        [currentMeal]: { ...prev[currentMeal], [memberId]: selectedFoodId },
-      }))
+      setMealAssignments(prev => {
+        const current = prev[currentMeal]?.[memberId] ?? []
+        const has = current.includes(selectedFoodId)
+        const next = has ? current.filter(id => id !== selectedFoodId) : [...current, selectedFoodId]
+        return {
+          ...prev,
+          [currentMeal]: { ...prev[currentMeal], [memberId]: next },
+        }
+      })
     } else if (isPackingSchoolLunch && memberId === CHILD_ID) {
       const food = findFood(selectedFoodId)
-      if (food?.packable) setSchoolLunchFood(selectedFoodId)
+      if (food?.packable) {
+        setSchoolLunchFood(prev => {
+          const has = prev.includes(selectedFoodId)
+          return has ? prev.filter(id => id !== selectedFoodId) : [...prev, selectedFoodId]
+        })
+      }
     }
   }
 
@@ -246,9 +328,15 @@ export function KitchenScene({ onExit }: Props) {
   }
   const resetBudgets = () => setBudgets(DEFAULT_BUDGETS)
 
+  // ---- family personalization ----
+  const updateFamilyMember = (id: string, patch: Partial<{ name: string; emoji: string }>) => {
+    setFamily(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m))
+  }
+  const resetFamily = () => setFamily(defaultFamily)
+
   // ---- speech bubble logic ----
   const speechFor = (memberId: string): { message?: string; tone?: MealTone } => {
-    const member = defaultFamily.find(m => m.id === memberId)
+    const member = family.find(m => m.id === memberId)
     if (!member) return {}
 
     if (state === 'end-of-day') {
@@ -257,54 +345,45 @@ export function KitchenScene({ onExit }: Props) {
     }
 
     if (mealsServed.dinner) {
-      const food = findFood(mealAssignments.dinner[memberId])
-      if (food) {
-        const r = reactionFor(member, food)
-        return { message: `For dinner: ${r.message}`, tone: r.tone }
-      }
+      const r = plateReaction(member, foodsOnPlate('dinner', memberId))
+      if (r) return { message: `For dinner: ${r.message}`, tone: r.tone }
     }
-
+    if (mealsServed.snack) {
+      const r = plateReaction(member, foodsOnPlate('snack', memberId))
+      if (r) return { message: `Snack: ${r.message}`, tone: r.tone }
+    }
     if (memberId === CHILD_ID) {
-      const homeLunch = mealsServed.lunch ? findFood(mealAssignments.lunch[CHILD_ID]) : undefined
-      if (homeLunch) {
-        const r = reactionFor(member, homeLunch)
-        return { message: `For lunch: ${r.message}`, tone: r.tone }
+      const home = mealsServed.lunch ? foodsOnPlate('lunch', CHILD_ID) : []
+      if (home.length > 0) {
+        const r = plateReaction(member, home)
+        if (r) return { message: `For lunch: ${r.message}`, tone: r.tone }
       }
       if (mealsServed.schoolLunch) {
-        const food = findFood(schoolLunchFood)
-        if (food) {
-          const r = reactionFor(member, food)
-          return { message: `For lunch: ${r.message}`, tone: r.tone }
-        }
+        const r = plateReaction(member, schoolLunchFoods())
+        if (r) return { message: `For lunch: ${r.message}`, tone: r.tone }
       }
     } else if (mealsServed.lunch) {
-      const food = findFood(mealAssignments.lunch[memberId])
-      if (food) {
-        const r = reactionFor(member, food)
-        return { message: `For lunch: ${r.message}`, tone: r.tone }
-      }
+      const r = plateReaction(member, foodsOnPlate('lunch', memberId))
+      if (r) return { message: `For lunch: ${r.message}`, tone: r.tone }
     }
 
     if (mealsServed.breakfast) {
-      const food = findFood(mealAssignments.breakfast[memberId])
-      if (food) {
-        const r = reactionFor(member, food)
-        return { message: r.message, tone: r.tone }
-      }
+      const r = plateReaction(member, foodsOnPlate('breakfast', memberId))
+      if (r) return { message: r.message, tone: r.tone }
     }
     return {}
   }
 
-  // ---- plate logic ----
-  const plateFor = (memberId: string): Food | undefined | null => {
+  // ---- plates: visible only in current planning context ----
+  const plateFor = (memberId: string): Food[] | undefined => {
     if (isPlanningMeal && currentMeal && currentConfig) {
-      const member = defaultFamily.find(m => m.id === memberId)
+      const member = family.find(m => m.id === memberId)
       if (member && currentConfig.hasPlate(member)) {
-        return findFood(currentAssignments?.[memberId]) ?? null
+        return foodsOnPlate(currentMeal, memberId)
       }
     }
     if (isPackingSchoolLunch && memberId === CHILD_ID) {
-      return findFood(schoolLunchFood) ?? null
+      return schoolLunchFoods()
     }
     return undefined
   }
@@ -315,17 +394,18 @@ export function KitchenScene({ onExit }: Props) {
       if (overBudget && overTime) return `Over budget AND over time — swap for cheaper/faster, or raise the budget in ⚙ settings.`
       if (overBudget) return `Over budget — try cheaper picks, or raise it in ⚙ settings.`
       if (overTime) return `Over time — try faster picks, or raise it in ⚙ settings.`
-      if (!allRequiredAssigned && selectedFoodId) return `Now tap a plate to serve it.`
-      if (!allRequiredAssigned) {
+      if (currentConfig.key === 'snack' && !anyPlateFilled) return 'Pick a food and tap a plate. Snacks are optional — fill the plates of whoever wants one.'
+      if (!allRequiredAssigned && selectedFoodId) return `Tap a plate to add this food (tap again on a plate that already has it to remove).`
+      if (currentConfig.key !== 'snack' && !allRequiredAssigned) {
         const remaining = currentRequiredMembers
-          .filter(m => !currentAssignments?.[m.id])
+          .filter(m => !mealAssignments[currentMeal!]?.[m.id]?.length)
           .map(m => m.name).join(', ')
-        const childNote = currentMeal === 'lunch' && !currentAssignments?.[CHILD_ID]
+        const childNote = currentMeal === 'lunch' && (mealAssignments.lunch?.[CHILD_ID]?.length ?? 0) === 0
           ? " Child's plate is optional — fill it if she's home for lunch instead of at school."
           : ''
         return `Pick a food, then tap a plate. Still to serve: ${remaining}.${childNote}`
       }
-      return `Looks good — serve ${currentConfig.label} when ready.`
+      return `Looks good — combine more items on a plate, or serve ${currentConfig.label} when ready.`
     }
     if (isPackingSchoolLunch) {
       const selected = findFood(selectedFoodId)
@@ -333,9 +413,9 @@ export function KitchenScene({ onExit }: Props) {
       if (overBudget) return "Too expensive for the lunchbox."
       if (overTime) return "Too slow to prep before school."
       if (selected && !selected.packable) return "That won't travel well — pick something packable."
-      if (!schoolLunchFood && selectedFoodId) return "Now tap the lunchbox to pack it."
-      if (!schoolLunchFood) return "Pick something packable for the child's school lunch."
-      return 'Looks good — pack it when ready.'
+      if (schoolLunchFood.length === 0 && selectedFoodId) return "Tap the lunchbox to pack it (multiple items welcome)."
+      if (schoolLunchFood.length === 0) return "Pick something packable for the child's school lunch. You can pack multiple items."
+      return 'Looks good — add more, or pack it when ready.'
     }
     return ''
   })()
@@ -377,19 +457,24 @@ export function KitchenScene({ onExit }: Props) {
     )
   }
 
-  const anythingServed = mealsServed.breakfast || mealsServed.schoolLunch || mealsServed.lunch || mealsServed.dinner
+  const anythingServed = Object.values(mealsServed).some(Boolean)
   const showCalories = anythingServed || state === 'end-of-day'
 
   const dayReports = state === 'end-of-day'
-    ? defaultFamily.map(m => ({ member: m, report: computeDayEnergy(m, consumedFoodsFor(m.id)) }))
+    ? family.map(m => ({ member: m, report: computeDayEnergy(m, consumedFoodsFor(m.id)) }))
     : []
   const everyoneFed = dayReports.every(r => r.report.status === 'well-fed' || r.report.status === 'comfortable')
 
   const mealCardEmojis = (mealKey: MealKey): string[] =>
-    defaultFamily
+    family
       .filter(MEAL_CONFIG[mealKey].hasPlate)
-      .map(m => findFood(mealAssignments[mealKey][m.id])?.emoji)
-      .filter((e): e is string => Boolean(e))
+      .flatMap(m => foodsOnPlate(mealKey, m.id).map(f => f.emoji))
+
+  const finishTutorial = () => {
+    setTutorialSeen(true)
+    setState('hub')
+    setTutorialStep(0)
+  }
 
   return (
     <main className="kitchen-scene">
@@ -398,12 +483,12 @@ export function KitchenScene({ onExit }: Props) {
           type="button"
           className="back-button"
           onClick={() => {
-            if (state === 'hub') onExit()
+            if (state === 'hub' || state === 'tutorial') onExit()
             else { setState('hub'); setSelectedFoodId(null) }
           }}
           aria-label={state === 'hub' ? 'Back to title screen' : 'Back to kitchen'}
         >
-          ← {state === 'hub' ? 'Title' : 'Kitchen'}
+          ← {state === 'hub' || state === 'tutorial' ? 'Title' : 'Kitchen'}
         </button>
         <div className="header-center">
           <span className="day-marker">{dayMarkerFor(state)}</span>
@@ -420,7 +505,7 @@ export function KitchenScene({ onExit }: Props) {
       </header>
 
       <section className="family-row" aria-label="Family">
-        {defaultFamily.map((member, i) => {
+        {family.map((member, i) => {
           const { message, tone } = speechFor(member.id)
           return (
             <FamilyMemberView
@@ -429,7 +514,7 @@ export function KitchenScene({ onExit }: Props) {
               speechDelayMs={200 * i}
               speechMessage={message}
               speechTone={tone}
-              assignedFood={plateFor(member.id)}
+              assignedFoods={plateFor(member.id)}
               onPlateClick={() => onPlateClick(member.id)}
               caloriesConsumed={showCalories ? caloriesFor(member.id) : undefined}
               macrosConsumed={showCalories ? macrosFor(member.id) : undefined}
@@ -445,41 +530,39 @@ export function KitchenScene({ onExit }: Props) {
         <section className="hub" aria-label="Kitchen menu">
           <p className="hub-title">What would you like to plan?</p>
           <div className="meal-cards">
-            <MealCard
-              emoji={MEAL_CONFIG.breakfast.emoji}
-              name="Breakfast"
+            <MealCard emoji="🍳" name="Breakfast"
               served={mealsServed.breakfast}
               foodEmojis={mealsServed.breakfast ? mealCardEmojis('breakfast') : []}
-              onClick={() => startPlanning('breakfast')}
-            />
-            <MealCard
-              emoji="🎒"
-              name="School lunch"
+              onClick={() => startPlanning('breakfast')} />
+            <MealCard emoji="🎒" name="School lunch"
               served={mealsServed.schoolLunch}
-              foodEmojis={mealsServed.schoolLunch && schoolLunchFood ? [findFood(schoolLunchFood)?.emoji ?? ''] : []}
-              onClick={startPackingSchoolLunch}
-            />
-            <MealCard
-              emoji={MEAL_CONFIG.lunch.emoji}
-              name="Lunch at home"
+              foodEmojis={mealsServed.schoolLunch ? schoolLunchFoods().map(f => f.emoji) : []}
+              onClick={startPackingSchoolLunch} />
+            <MealCard emoji="🥗" name="Lunch at home"
               served={mealsServed.lunch}
               foodEmojis={mealsServed.lunch ? mealCardEmojis('lunch') : []}
-              onClick={() => startPlanning('lunch')}
-            />
-            <MealCard
-              emoji={MEAL_CONFIG.dinner.emoji}
-              name="Dinner"
+              onClick={() => startPlanning('lunch')} />
+            <MealCard emoji="🍪" name="Snack"
+              served={mealsServed.snack}
+              foodEmojis={mealsServed.snack ? mealCardEmojis('snack') : []}
+              onClick={() => startPlanning('snack')} />
+            <MealCard emoji="🍝" name="Dinner"
               served={mealsServed.dinner}
               foodEmojis={mealsServed.dinner ? mealCardEmojis('dinner') : []}
-              onClick={() => startPlanning('dinner')}
-            />
+              onClick={() => startPlanning('dinner')} />
           </div>
-          <div className="kitchen-actions">
+          <div className="kitchen-actions hub-actions">
             <button type="button" className="primary-action" onClick={goToEndOfDay}>
               🌙 See end of day
             </button>
             <button type="button" className="secondary-action" onClick={() => setState('budgets')}>
               ⚙ Adjust budgets
+            </button>
+            <button type="button" className="secondary-action" onClick={() => setState('family-settings')}>
+              👨‍👩‍👧 Edit family
+            </button>
+            <button type="button" className="secondary-action" onClick={() => { setTutorialStep(0); setState('tutorial') }}>
+              ❔ Replay tutorial
             </button>
             {anythingServed && (
               <button type="button" className="secondary-action" onClick={reset}>
@@ -565,7 +648,7 @@ export function KitchenScene({ onExit }: Props) {
           <p className="day-summary-lesson">
             {everyoneFed
               ? "Everyone made it through Day 1 with enough fuel. Real bodies need lots of food — that's a balanced day."
-              : "Even with breakfast, lunch, dinner, and a packed school lunch, single-item meals aren't enough fuel for most bodies. Combo meals (yogurt + bread + apple together on one plate) are the next step — coming soon."}
+              : "Try combo plates (multiple items per person) and add snacks to fill the gaps. Real bodies need a steady stream of food across the day, not single items per meal."}
           </p>
           <div className="kitchen-actions">
             <button type="button" className="primary-action" onClick={() => setState('hub')}>
@@ -585,56 +668,57 @@ export function KitchenScene({ onExit }: Props) {
             Set how much money and time you have for each meal. Bigger budget = more freedom; tighter budget = harder puzzle.
           </p>
           <ul className="budget-list">
-            {(['breakfast', 'schoolLunch', 'lunch', 'dinner'] as const).map(key => {
+            {(['breakfast', 'schoolLunch', 'lunch', 'snack', 'dinner'] as const).map(key => {
               const cfg = BUDGET_LABELS[key]
               const b = budgets[key]
               return (
                 <li key={key} className="budget-row">
-                  <span className="budget-meal-label">
-                    <span aria-hidden="true">{cfg.emoji}</span> {cfg.label}
-                  </span>
-                  <BudgetStepper
-                    icon="💰"
-                    unit="coins"
-                    value={b.coins}
+                  <span className="budget-meal-label"><span aria-hidden="true">{cfg.emoji}</span> {cfg.label}</span>
+                  <BudgetStepper icon="💰" unit="coins" value={b.coins}
                     onDec={() => updateBudget(key, 'coins', -BUDGET_LIMITS.coins.step)}
                     onInc={() => updateBudget(key, 'coins',  BUDGET_LIMITS.coins.step)}
                     canDec={b.coins > BUDGET_LIMITS.coins.min}
-                    canInc={b.coins < BUDGET_LIMITS.coins.max}
-                  />
-                  <BudgetStepper
-                    icon="⏱"
-                    unit="min"
-                    value={b.minutes}
+                    canInc={b.coins < BUDGET_LIMITS.coins.max} />
+                  <BudgetStepper icon="⏱" unit="min" value={b.minutes}
                     onDec={() => updateBudget(key, 'minutes', -BUDGET_LIMITS.minutes.step)}
                     onInc={() => updateBudget(key, 'minutes',  BUDGET_LIMITS.minutes.step)}
                     canDec={b.minutes > BUDGET_LIMITS.minutes.min}
-                    canInc={b.minutes < BUDGET_LIMITS.minutes.max}
-                  />
+                    canInc={b.minutes < BUDGET_LIMITS.minutes.max} />
                 </li>
               )
             })}
           </ul>
           <div className="kitchen-actions">
-            <button type="button" className="primary-action" onClick={() => setState('hub')}>
-              ← Back to kitchen
-            </button>
-            <button type="button" className="secondary-action" onClick={resetBudgets}>
-              🔄 Reset to defaults
-            </button>
+            <button type="button" className="primary-action" onClick={() => setState('hub')}>← Back to kitchen</button>
+            <button type="button" className="secondary-action" onClick={resetBudgets}>🔄 Reset to defaults</button>
           </div>
         </section>
       )}
 
+      {state === 'family-settings' && (
+        <FamilySettings
+          family={family}
+          onUpdate={updateFamilyMember}
+          onReset={resetFamily}
+          onBack={() => setState('hub')}
+        />
+      )}
+
+      {state === 'tutorial' && (
+        <TutorialOverlay
+          step={tutorialStep}
+          onNext={() => setTutorialStep(s => s + 1)}
+          onSkip={finishTutorial}
+          onFinish={finishTutorial}
+        />
+      )}
+
       <footer className="kitchen-footer">
         {state === 'hub' && (
-          <p><em>Pick any meal to plan or replan. Order doesn't matter — go to end-of-day anytime to see how the day balanced out.</em></p>
+          <p><em>Pick any meal. Combo plates (multiple items per person) are how you feed everyone — your data persists between visits.</em></p>
         )}
         {(isPlanningMeal || isPackingSchoolLunch) && (
-          <p><em>Green = ideal · yellow = okay · orange or red = wrong fit.</em></p>
-        )}
-        {state === 'budgets' && (
-          <p><em>Tighter budgets teach the time-cost-nutrition tradeoff harder. Looser budgets let you experiment freely.</em></p>
+          <p><em>Green = ideal · yellow = okay · orange or red = wrong fit. Tap a food twice on one plate to remove it.</em></p>
         )}
       </footer>
     </main>
@@ -642,13 +726,8 @@ export function KitchenScene({ onExit }: Props) {
 }
 
 type MealCardProps = {
-  emoji: string
-  name: string
-  served: boolean
-  foodEmojis: string[]
-  onClick: () => void
+  emoji: string; name: string; served: boolean; foodEmojis: string[]; onClick: () => void
 }
-
 function MealCard({ emoji, name, served, foodEmojis, onClick }: MealCardProps) {
   return (
     <button
@@ -660,50 +739,148 @@ function MealCard({ emoji, name, served, foodEmojis, onClick }: MealCardProps) {
       <span className="meal-card-emoji" aria-hidden="true">{emoji}</span>
       <span className="meal-card-name">{name}</span>
       <span className="meal-card-status">
-        {served ? (
-          <>✓ {foodEmojis.length > 0 ? foodEmojis.join(' ') : 'served'}</>
-        ) : (
-          'Not yet'
-        )}
+        {served ? (<>✓ {foodEmojis.length > 0 ? foodEmojis.join(' ') : 'served'}</>) : 'Not yet'}
       </span>
     </button>
   )
 }
 
 type BudgetStepperProps = {
-  icon: string
-  unit: string
-  value: number
-  onDec: () => void
-  onInc: () => void
-  canDec: boolean
-  canInc: boolean
+  icon: string; unit: string; value: number
+  onDec: () => void; onInc: () => void
+  canDec: boolean; canInc: boolean
 }
-
 function BudgetStepper({ icon, unit, value, onDec, onInc, canDec, canInc }: BudgetStepperProps) {
   return (
     <div className="budget-stepper">
       <span className="budget-stepper-icon" aria-hidden="true">{icon}</span>
-      <button
-        type="button"
-        className="budget-stepper-button"
-        onClick={onDec}
-        disabled={!canDec}
-        aria-label={`Decrease ${unit}`}
-      >
-        −
-      </button>
+      <button type="button" className="budget-stepper-button" onClick={onDec} disabled={!canDec} aria-label={`Decrease ${unit}`}>−</button>
       <span className="budget-stepper-value">{value}</span>
-      <button
-        type="button"
-        className="budget-stepper-button"
-        onClick={onInc}
-        disabled={!canInc}
-        aria-label={`Increase ${unit}`}
-      >
-        +
-      </button>
+      <button type="button" className="budget-stepper-button" onClick={onInc} disabled={!canInc} aria-label={`Increase ${unit}`}>+</button>
       <span className="budget-stepper-unit">{unit}</span>
+    </div>
+  )
+}
+
+// ===== Family settings =====
+const EMOJI_BY_STAGE: Record<string, string[]> = {
+  baby:  ['👶', '👶🏻', '👶🏽', '👶🏾'],
+  child: ['🧒', '👦', '👧', '🧒🏻', '🧒🏽', '🧒🏾'],
+  adult: ['🧑', '👨', '👩', '🧑🏻', '🧑🏽', '🧑🏾', '👨‍🦱', '👩‍🦰'],
+  elder: ['🧓', '👴', '👵', '🧓🏻', '🧓🏽', '🧓🏾'],
+}
+
+type FamilySettingsProps = {
+  family: FamilyMember[]
+  onUpdate: (id: string, patch: Partial<{ name: string; emoji: string }>) => void
+  onReset: () => void
+  onBack: () => void
+}
+function FamilySettings({ family, onUpdate, onReset, onBack }: FamilySettingsProps) {
+  return (
+    <section className="family-settings" aria-label="Family settings">
+      <h2 className="family-settings-title">👨‍👩‍👧 Your family</h2>
+      <p className="family-settings-hint">
+        Give each family member a name. Pick an emoji that looks like them. Life stages stay the same — the baby needs different food from the adult, no matter what you call them.
+      </p>
+      <ul className="family-edit-list">
+        {family.map(m => (
+          <li key={m.id} className="family-edit-row">
+            <span className="family-edit-stage">{m.profile.lifeStage}</span>
+            <span className="family-edit-emoji" aria-hidden="true">{m.emoji}</span>
+            <label className="family-edit-name-field">
+              <span className="visually-hidden">Name for {m.profile.lifeStage}</span>
+              <input
+                type="text"
+                value={m.name}
+                onChange={(e) => onUpdate(m.id, { name: e.target.value.slice(0, 20) })}
+                className="family-edit-name-input"
+                placeholder={m.profile.lifeStage}
+                maxLength={20}
+              />
+            </label>
+            <div className="family-edit-emoji-row">
+              {(EMOJI_BY_STAGE[m.profile.lifeStage] ?? [m.emoji]).map(e => (
+                <button
+                  key={e}
+                  type="button"
+                  className={`family-edit-emoji-button ${m.emoji === e ? 'is-active' : ''}`}
+                  onClick={() => onUpdate(m.id, { emoji: e })}
+                  aria-label={`Use emoji ${e}`}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="kitchen-actions">
+        <button type="button" className="primary-action" onClick={onBack}>← Back to kitchen</button>
+        <button type="button" className="secondary-action" onClick={onReset}>🔄 Reset to defaults</button>
+      </div>
+    </section>
+  )
+}
+
+// ===== Tutorial overlay =====
+type TutorialOverlayProps = {
+  step: number
+  onNext: () => void
+  onSkip: () => void
+  onFinish: () => void
+}
+
+const TUTORIAL_STEPS = [
+  {
+    title: 'Welcome to Critter Cafe!',
+    body: 'You are the family nutritionist. Your job: feed everyone right — the baby, the child, the adult, and the elder all have different needs.',
+    emoji: '👨‍👩‍👧',
+  },
+  {
+    title: 'Each meal has a budget',
+    body: 'Money (💰 coins) and time (⏱ minutes). Pick foods within both. Different foods are cheap, fast, healthy — but rarely all three.',
+    emoji: '💰',
+  },
+  {
+    title: 'Build plates with combos',
+    body: 'Pick a food, tap a plate to add it. Tap again on the same plate to remove. Combine items (bread + cheese + tomato) so each person gets enough calories and macros.',
+    emoji: '🍽',
+  },
+  {
+    title: 'Watch the reactions',
+    body: 'Speech bubbles turn green for ideal, red for unsafe. Calorie bars show daily progress. End of day shows the truth — did everyone get fed?',
+    emoji: '✨',
+  },
+]
+
+function TutorialOverlay({ step, onNext, onSkip, onFinish }: TutorialOverlayProps) {
+  const current = TUTORIAL_STEPS[step]
+  const isLast = step === TUTORIAL_STEPS.length - 1
+  if (!current) return null
+  return (
+    <div className="tutorial-overlay" role="dialog" aria-modal="true" aria-label="Tutorial">
+      <div className="tutorial-card">
+        <div className="tutorial-emoji" aria-hidden="true">{current.emoji}</div>
+        <h2 className="tutorial-title">{current.title}</h2>
+        <p className="tutorial-body">{current.body}</p>
+        <div className="tutorial-dots" aria-hidden="true">
+          {TUTORIAL_STEPS.map((_, i) => (
+            <span key={i} className={`tutorial-dot ${i === step ? 'is-active' : ''}`} />
+          ))}
+        </div>
+        <div className="kitchen-actions tutorial-actions">
+          {!isLast && (
+            <button type="button" className="primary-action" onClick={onNext}>Next →</button>
+          )}
+          {isLast && (
+            <button type="button" className="primary-action" onClick={onFinish}>Got it! Let's cook.</button>
+          )}
+          {!isLast && (
+            <button type="button" className="secondary-action" onClick={onSkip}>Skip</button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -721,8 +898,11 @@ function dayMarkerFor(state: KitchenState): string {
   if (state === 'planning-breakfast') return '🍳 Breakfast'
   if (state === 'packing-school-lunch') return '🎒 School lunch'
   if (state === 'planning-lunch') return '🥗 Midday lunch'
+  if (state === 'planning-snack') return '🍪 Snack'
   if (state === 'planning-dinner') return '🍝 Dinner'
   if (state === 'end-of-day') return '🌙 Bedtime'
   if (state === 'budgets') return '⚙ Budgets'
+  if (state === 'family-settings') return '👨‍👩‍👧 Family'
+  if (state === 'tutorial') return '❔ How to play'
   return '☀ Day 1'
 }
