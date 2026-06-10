@@ -42,6 +42,18 @@ export function computeDayEnergy(member: FamilyMember, consumedFoods: Food[]): E
   return { consumed, burned, target, net, ratioOfTarget, status, tone, verdict, macros, macroTargets }
 }
 
+/** How a character greets the morning after a day with this energy status.
+ *  Used for day-to-day carry-over: yesterday's eating shows up in today's
+ *  first speech bubble — visible consequence, never shame. */
+export function morningAfter(status: EnergyStatus): { tone: MealTone; message: string } {
+  switch (status) {
+    case 'well-fed':    return { tone: 'ideal', message: 'Slept great — full of energy! 💪' }
+    case 'comfortable': return { tone: 'okay',  message: "Morning! Could've eaten a bit more yesterday." }
+    case 'hungry':      return { tone: 'poor',  message: 'I went to bed hungry last night... 😞' }
+    case 'starving':    return { tone: 'bad',   message: 'So tired... I barely slept. I need real meals today.' }
+  }
+}
+
 function classify(ratio: number, name: string): { status: EnergyStatus; tone: MealTone; verdict: string } {
   if (ratio >= 0.9) {
     return { status: 'well-fed',    tone: 'ideal', verdict: `${name} ends the day energized! 💪` }

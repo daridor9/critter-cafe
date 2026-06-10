@@ -1,0 +1,129 @@
+.dex {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dex-title {
+  font-family: var(--heading);
+  font-size: 1.6rem;
+  margin: 0;
+  color: var(--accent);
+}
+
+.dex-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-align: center;
+  font-style: italic;
+  max-width: 55ch;
+}
+
+.dex-hint strong {
+  color: var(--text-h);
+}
+
+.dex-kitchen {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dex-kitchen-title {
+  font-family: var(--heading);
+  font-size: 1.1rem;
+  margin: 8px 0 0 0;
+  color: var(--text-h);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dex-count {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text);
+  opacity: 0.75;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.dex-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.dex-card-unknown {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.dex-card-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.dex-card-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-h);
+}
+
+.dex-card-meta {
+  font-size: 0.7rem;
+  color: var(--text);
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-card-macros {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.dex-card-stages {
+  display: flex;
+  gap: 8px;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.dex-card-fact {
+  font-size: 0.72rem;
+  color: var(--text);
+  font-style: italic;
+  line-height: 1.35;
+  margin-top: 4px;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dex-card {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}

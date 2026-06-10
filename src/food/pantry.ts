@@ -43,6 +43,7 @@ export const defaultPantry: Food[] = [
     id: 'fish', name: 'Fish', emoji: '🐟',
     cost: 4, prepMinutes: 12, packable: false,
     calories: 200, protein: 25, carbs: 0, fat: 12,
+    funFact: 'Oily fish is one of the best brain foods we know — the omega-3 fats in it are literally building blocks of the brain.',
     reactions: {
       baby:  { tone: 'poor',  message: 'Bones scare me!' },
       child: { tone: 'ideal', message: 'Pink fish, yum!' },
@@ -111,6 +112,7 @@ export const defaultPantry: Food[] = [
     id: 'quinoa', name: 'Quinoa', emoji: '🌾',
     cost: 3, prepMinutes: 15, packable: true,
     calories: 220, protein: 8, carbs: 39, fat: 4,
+    funFact: 'One of the very few plants with all nine essential amino acids — a complete protein, no meat required.',
     reactions: {
       baby:  { tone: 'okay',  message: 'Tiny grains, ok.' },
       child: { tone: 'okay',  message: 'Healthy stuff.' },
@@ -203,6 +205,7 @@ export const defaultPantry: Food[] = [
     id: 'honey', name: 'Honey', emoji: '🍯',
     cost: 2, prepMinutes: 1, packable: true,
     calories: 60, protein: 0, carbs: 17, fat: 0,
+    funFact: 'Never for babies under one — honey can carry spores that tiny tummies cannot handle yet.',
     reactions: {
       baby:  { tone: 'bad',   message: 'Honey is dangerous for babies! 😟' },
       child: { tone: 'okay',  message: 'Sweet treat!' },

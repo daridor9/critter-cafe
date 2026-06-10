@@ -18,5 +18,6 @@ export type Food = {
   protein: number      // grams per serving
   carbs: number        // grams per serving
   fat: number          // grams per serving
+  funFact?: string     // shown on the Nutrient-dex card once discovered
   reactions: Record<LifeStage, MealReaction>
 }

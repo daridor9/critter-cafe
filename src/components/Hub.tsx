@@ -15,11 +15,12 @@ type Props = {
   onKitchenSelect: () => void
   onBudgets: () => void
   onFamily: () => void
+  onDex: () => void
   onTutorial: () => void
   onResetDay: () => void
 }
 
-export function Hub({ cards, anythingServed, onEndOfDay, onKitchenSelect, onBudgets, onFamily, onTutorial, onResetDay }: Props) {
+export function Hub({ cards, anythingServed, onEndOfDay, onKitchenSelect, onBudgets, onFamily, onDex, onTutorial, onResetDay }: Props) {
   return (
     <section className="hub" aria-label="Kitchen menu">
       <p className="hub-title">What would you like to plan?</p>
@@ -31,6 +32,7 @@ export function Hub({ cards, anythingServed, onEndOfDay, onKitchenSelect, onBudg
         <button type="button" className="secondary-action" onClick={onKitchenSelect}>🌍 Switch kitchen</button>
         <button type="button" className="secondary-action" onClick={onBudgets}>⚙ Adjust budgets</button>
         <button type="button" className="secondary-action" onClick={onFamily}>👨‍👩‍👧 Edit family</button>
+        <button type="button" className="secondary-action" onClick={onDex}>📔 Nutrient-dex</button>
         <button type="button" className="secondary-action" onClick={onTutorial}>❔ Tutorial</button>
         {anythingServed && <button type="button" className="secondary-action" onClick={onResetDay}>🔄 Reset day</button>}
       </div>

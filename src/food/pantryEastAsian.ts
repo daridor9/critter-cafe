@@ -88,6 +88,7 @@ export const eastAsianPantry: Food[] = [
     id: 'ea-greentea', name: 'Green tea', emoji: '🍵',
     cost: 1, prepMinutes: 3, packable: false,
     calories: 0, protein: 0, carbs: 0, fat: 0,
+    funFact: 'Tea has caffeine just like coffee — which is exactly why it is a grown-up drink.',
     reactions: {
       baby:  { tone: 'bad',   message: 'No caffeine for babies!' },
       child: { tone: 'bad',   message: 'Tea has caffeine — not for kids!' },
@@ -143,6 +144,7 @@ export const eastAsianPantry: Food[] = [
     id: 'ea-mochi', name: 'Mochi', emoji: '🍡',
     cost: 2, prepMinutes: 1, packable: true,
     calories: 110, protein: 1, carbs: 25, fat: 0,
+    funFact: 'In Japan, sticky mochi comes with a real public-safety warning for elders every New Year.',
     reactions: {
       baby:  { tone: 'bad',   message: 'Sticky mochi can choke me!' },
       child: { tone: 'okay',  message: 'Chewy treat!' },

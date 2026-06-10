@@ -2,8 +2,9 @@ import type { Food } from './types'
 import { defaultPantry } from './pantry'
 import { eastAsianPantry } from './pantryEastAsian'
 import { latinPantry } from './pantryLatin'
+import { levantPantry } from './pantryLevant'
 
-export type KitchenId = 'mediterranean' | 'eastAsian' | 'latin'
+export type KitchenId = 'mediterranean' | 'eastAsian' | 'latin' | 'levant'
 
 export type Kitchen = {
   id: KitchenId
@@ -34,6 +35,13 @@ export const KITCHENS: Record<KitchenId, Kitchen> = {
     emoji: '🌮',
     tagline: 'Beans + rice = complete protein. Corn, avocado, and bright flavors.',
     pantry: latinPantry,
+  },
+  levant: {
+    id: 'levant',
+    name: 'Levantine Kitchen',
+    emoji: '🥙',
+    tagline: 'Hummus, tahini, pita, and fresh chopped salads — the Eastern Mediterranean home table.',
+    pantry: levantPantry,
   },
 }
 

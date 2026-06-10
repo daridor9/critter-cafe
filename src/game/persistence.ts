@@ -1,4 +1,5 @@
 import type { FamilyMember } from '../family/types'
+import type { EnergyStatus } from '../family/energy'
 import type { MealBudget, MealKey as BudgetKey } from '../food/budget'
 import type { KitchenId } from '../food/kitchens'
 import type { MealKey, ServedKey } from './meals'
@@ -6,6 +7,8 @@ import type { MealKey, ServedKey } from './meals'
 export type Plate = string[]  // food IDs
 export type MealAssignmentsMap = Record<MealKey, Record<string, Plate>>
 
+// Version 3 schema. dexSeen and carryOver were added later but are
+// optional-on-load (default [] / {}), so no version bump was needed.
 export type SavedState = {
   version: number
   mealAssignments: MealAssignmentsMap
@@ -16,6 +19,8 @@ export type SavedState = {
   kitchenId: KitchenId
   day: number
   tutorialSeen: boolean
+  dexSeen: string[]                         // food IDs ever served (Nutrient-dex)
+  carryOver: Record<string, EnergyStatus>   // yesterday's end status per member
 }
 
 const STORAGE_KEY = 'critter-cafe-state'

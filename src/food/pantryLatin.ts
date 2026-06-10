@@ -10,6 +10,7 @@ export const latinPantry: Food[] = [
     id: 'la-beans', name: 'Beans', emoji: '🫘',
     cost: 1, prepMinutes: 10, packable: true,
     calories: 180, protein: 11, carbs: 30, fat: 1,
+    funFact: 'Beans + rice together make a complete protein — a trick food cultures discovered independently all over the world.',
     reactions: {
       baby:  { tone: 'ideal', message: 'Mashed beans, yum!' },
       child: { tone: 'okay',  message: 'Beans again? Fine...' },
@@ -43,6 +44,7 @@ export const latinPantry: Food[] = [
     id: 'la-avocado', name: 'Avocado', emoji: '🥑',
     cost: 2, prepMinutes: 2, packable: true,
     calories: 160, protein: 2, carbs: 9, fat: 15,
+    funFact: 'Pediatricians often recommend avocado as one of the very first solid foods a baby ever eats.',
     reactions: {
       baby:  { tone: 'ideal', message: 'The perfect baby food!' },
       child: { tone: 'okay',  message: 'Green mush... ok.' },

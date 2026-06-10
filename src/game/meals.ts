@@ -8,7 +8,7 @@ export type ServedKey = MealKey | 'schoolLunch'
 export type KitchenState =
   | 'hub'
   | 'planning-breakfast' | 'packing-school-lunch' | 'planning-lunch' | 'planning-snack' | 'planning-dinner'
-  | 'end-of-day' | 'budgets' | 'family-settings' | 'kitchen-select' | 'tutorial'
+  | 'end-of-day' | 'budgets' | 'family-settings' | 'kitchen-select' | 'nutrient-dex' | 'tutorial'
 
 export type MealConfig = {
   key: MealKey
@@ -90,6 +90,7 @@ export function dayMarkerFor(state: KitchenState): string {
   if (state === 'budgets') return '⚙ Budgets'
   if (state === 'family-settings') return '👨‍👩‍👧 Family'
   if (state === 'kitchen-select') return '🌍 Kitchens'
+  if (state === 'nutrient-dex') return '📔 Nutrient-dex'
   if (state === 'tutorial') return '❔ How to play'
   return 'Day'
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { defaultFamily } from '../family/defaultFamily'
 import { STAGE_PROFILES, STAGE_DEFAULTS, MAX_FAMILY_SIZE } from '../family/stages'
-import { computeDayEnergy } from '../family/energy'
+import { computeDayEnergy, morningAfter, type EnergyStatus } from '../family/energy'
 import type { FamilyMember, LifeStage } from '../family/types'
 import type { Food, MealTone } from '../food/types'
 import { KITCHENS, DEFAULT_KITCHEN, type KitchenId } from '../food/kitchens'
@@ -21,6 +21,7 @@ import { EndOfDayReport } from './EndOfDayReport'
 import { BudgetSettings } from './BudgetSettings'
 import { FamilySettings } from './FamilySettings'
 import { KitchenSelect } from './KitchenSelect'
+import { NutrientDex } from './NutrientDex'
 import { Tutorial } from './Tutorial'
 import './KitchenScene.css'
 
@@ -40,10 +41,12 @@ export function KitchenScene({ onExit }: Props) {
   const [day, setDay] = useState<number>(saved.day ?? 1)
   const [tutorialSeen, setTutorialSeen] = useState<boolean>(saved.tutorialSeen ?? false)
   const [tutorialStep, setTutorialStep] = useState(0)
+  const [dexSeen, setDexSeen] = useState<string[]>(saved.dexSeen ?? [])
+  const [carryOver, setCarryOver] = useState<Record<string, EnergyStatus>>(saved.carryOver ?? {})
 
   useEffect(() => {
-    saveState({ mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen })
-  }, [mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen])
+    saveState({ mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen, dexSeen, carryOver })
+  }, [mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen, dexSeen, carryOver])
 
   const kitchen = KITCHENS[kitchenId]
   const pantry = kitchen.pantry
@@ -139,8 +142,20 @@ export function KitchenScene({ onExit }: Props) {
   // ---- transitions ----
   const startPlanning = (mealKey: MealKey) => { setState(MEAL_CONFIG[mealKey].planState); setSelectedFoodId(null) }
   const startPackingSchoolLunch = () => { setState('packing-school-lunch'); setSelectedFoodId(null) }
-  const serveMeal = () => { if (!currentConfig) return; setMealsServed(p => ({ ...p, [currentConfig.key]: true })); setState('hub'); setSelectedFoodId(null) }
-  const packSchoolLunch = () => { setMealsServed(p => ({ ...p, schoolLunch: true })); setState('hub'); setSelectedFoodId(null) }
+  const discoverFoods = (ids: string[]) => {
+    if (ids.length > 0) setDexSeen(prev => Array.from(new Set([...prev, ...ids])))
+  }
+  const serveMeal = () => {
+    if (!currentConfig || !currentMeal) return
+    discoverFoods(currentPlateMembers.flatMap(m => mealAssignments[currentMeal]?.[m.id] ?? []))
+    setMealsServed(p => ({ ...p, [currentConfig.key]: true }))
+    setState('hub'); setSelectedFoodId(null)
+  }
+  const packSchoolLunch = () => {
+    discoverFoods(childMembers.flatMap(m => schoolLunches[m.id] ?? []))
+    setMealsServed(p => ({ ...p, schoolLunch: true }))
+    setState('hub'); setSelectedFoodId(null)
+  }
   const backToHub = () => { setState('hub'); setSelectedFoodId(null) }
 
   const clearDay = () => {
@@ -150,9 +165,17 @@ export function KitchenScene({ onExit }: Props) {
     setSelectedFoodId(null)
   }
   const resetDay = () => { clearDay(); setState('hub') }
-  const startNextDay = () => { clearDay(); setDay(d => d + 1); setState('hub') }
+  const startNextDay = () => {
+    // Yesterday's eating becomes today's morning state.
+    const next: Record<string, EnergyStatus> = {}
+    for (const m of family) next[m.id] = computeDayEnergy(m, consumedFoodsFor(m.id)).status
+    setCarryOver(next)
+    clearDay()
+    setDay(d => d + 1)
+    setState('hub')
+  }
   const switchKitchen = (id: KitchenId) => {
-    if (id !== kitchenId) { setKitchenId(id); clearDay(); setDay(1) }
+    if (id !== kitchenId) { setKitchenId(id); clearDay(); setDay(1); setCarryOver({}) }
     setState('hub')
   }
 
@@ -228,6 +251,12 @@ export function KitchenScene({ onExit }: Props) {
     if (mealsServed.breakfast) {
       const r = plateReaction(member, foodsOnPlate('breakfast', memberId))
       if (r) return { message: r.message, tone: r.tone }
+    }
+    // Nothing eaten yet today — carry over yesterday's energy as the morning mood.
+    const yesterday = carryOver[memberId]
+    if (yesterday) {
+      const m = morningAfter(yesterday)
+      return { message: m.message, tone: m.tone }
     }
     return {}
   }
@@ -332,6 +361,7 @@ export function KitchenScene({ onExit }: Props) {
           onKitchenSelect={() => setState('kitchen-select')}
           onBudgets={() => setState('budgets')}
           onFamily={() => setState('family-settings')}
+          onDex={() => setState('nutrient-dex')}
           onTutorial={() => { setTutorialStep(0); setState('tutorial') }}
           onResetDay={resetDay} />
       )}
@@ -362,6 +392,10 @@ export function KitchenScene({ onExit }: Props) {
 
       {state === 'kitchen-select' && (
         <KitchenSelect activeId={kitchenId} onSelect={switchKitchen} onBack={backToHub} />
+      )}
+
+      {state === 'nutrient-dex' && (
+        <NutrientDex seen={new Set(dexSeen)} onBack={backToHub} />
       )}
 
       {state === 'budgets' && (
