@@ -2,14 +2,18 @@ import './Splash.css'
 
 type Props = {
   onEnter: () => void
+  onAbout: () => void
 }
 
-export function Splash({ onEnter }: Props) {
+export function Splash({ onEnter, onAbout }: Props) {
   return (
     <main
       className="splash"
       onClick={onEnter}
       onKeyDown={(e) => {
+        // Only react to keys on the splash surface itself — not on the
+        // nested About button (its own Enter/Space click bubbles up here).
+        if (e.target !== e.currentTarget) return
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onEnter()
@@ -35,6 +39,15 @@ export function Splash({ onEnter }: Props) {
       </p>
 
       <p className="start-hint">Click anywhere to start</p>
+
+      <button
+        type="button"
+        className="about-button"
+        onClick={(e) => { e.stopPropagation(); onAbout() }}
+        aria-label="About this game"
+      >
+        ℹ About this game
+      </button>
     </main>
   )
 }

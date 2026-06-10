@@ -2,6 +2,8 @@
 
 A free, open-source nutrition game co-designed by **Dan and Adam (age 9)**.
 
+**▶ Play it now: [daridor9.github.io/critter-cafe](https://daridor9.github.io/critter-cafe/)** · 📖 [Read the story behind the game](docs/blog-post.md)
+
 ## What it is
 
 You are the family nutritionist. Your family of four — a baby, a child, an adult, and an elder — each has different needs. You shop on a weekly grocery budget, plan meals, manage spoilage, and learn what real food does for real bodies. The game teaches by *putting you in charge*, not by lecturing.
@@ -23,7 +25,7 @@ Pick any two; the third pays the price. Learning to balance them *is* the game.
 
 ## Status
 
-Early development — May 2026. Currently a splash screen while the first kitchen scene is built. Follow along.
+**v1 — playable end-to-end** (June 2026). Plan a full day of meals — breakfast, packed school lunches, lunch at home, a snack, and dinner — with combination plates, real calorie/macro tracking per life stage, and an honest end-of-day energy report. Three switchable kitchens (Mediterranean, East Asian, Latin American), an editable family of up to 8 (multiple kids each get their own lunchbox), adjustable budgets, multi-day play, a first-run tutorial, and automatic saving in the browser.
 
 ## Sister project
 
