@@ -1,0 +1,132 @@
+.day-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.day-summary-title {
+  font-family: var(--heading);
+  font-size: 1.8rem;
+  margin: 0;
+  color: var(--accent);
+}
+
+.energy-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.energy-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.energy-row-well-fed    { border-color: #6b8e4e; background: rgba(107, 142, 78, 0.08); }
+.energy-row-comfortable { border-color: #c8a64f; background: rgba(200, 166, 79, 0.08); }
+.energy-row-hungry      { border-color: #c75d3a; background: rgba(199, 93, 58, 0.08); }
+.energy-row-starving    { border-color: #a83232; background: rgba(168, 50, 50, 0.10); }
+
+.energy-row-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 90px;
+}
+
+.energy-row-emoji { font-size: 1.8rem; line-height: 1; }
+.energy-row-name {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.energy-row-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+
+.energy-row-stats strong {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.energy-row-bmr {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  flex-basis: 100%;
+  font-style: italic;
+}
+
+/* End-of-day macro chips use intensity-based coloring (good/okay/low/empty)
+   so the player can see at a glance which macros hit target. */
+.energy-row-macros {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.energy-row-macros .macro-pill {
+  font-size: 0.78rem;
+  padding: 3px 8px;
+}
+
+.macro-good   { background: rgba(107, 142, 78, 0.18); color: #486334; }
+.macro-okay   { background: rgba(200, 166, 79, 0.18); color: #806a26; }
+.macro-low    { background: rgba(199, 93, 58, 0.18);  color: #8a3e22; }
+.macro-empty  { background: rgba(168, 50, 50, 0.15);  color: #7d2929; }
+
+@media (prefers-color-scheme: dark) {
+  .macro-good  { background: rgba(155, 184, 122, 0.22); color: #b5d390; }
+  .macro-okay  { background: rgba(200, 166, 79, 0.22);  color: #e3c878; }
+  .macro-low   { background: rgba(232, 130, 96, 0.22);  color: #f0b89e; }
+  .macro-empty { background: rgba(229, 115, 115, 0.22); color: #f4a8a8; }
+}
+
+.day-summary-lesson {
+  margin: 8px 0 0 0;
+  font-style: italic;
+  color: var(--text);
+  text-align: center;
+  max-width: 60ch;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  .energy-row {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+@media (max-width: 720px) {
+  .energy-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .energy-row-stats {
+    width: 100%;
+  }
+}

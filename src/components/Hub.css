@@ -1,0 +1,87 @@
+.hub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  max-width: 540px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hub-title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text);
+  font-style: italic;
+}
+
+.meal-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.meal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  color: var(--text-h);
+  font-family: inherit;
+}
+
+.meal-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.meal-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.meal-card-served {
+  border-color: #6b8e4e;
+  background: rgba(107, 142, 78, 0.10);
+}
+
+.meal-card-emoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.meal-card-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.meal-card-status {
+  font-size: 0.8rem;
+  color: var(--text);
+  opacity: 0.85;
+  letter-spacing: 0.2px;
+}
+
+.meal-card-served .meal-card-status {
+  color: #6b8e4e;
+  font-weight: 600;
+  opacity: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .meal-card {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .meal-card-served {
+    background: rgba(107, 142, 78, 0.15);
+  }
+}

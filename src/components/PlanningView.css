@@ -1,0 +1,197 @@
+.pantry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  position: relative;
+}
+
+/* Sticky action bar inside .pantry — keeps Serve / Back to kitchen
+   always reachable even when the 20-item pantry pushes them off-screen. */
+.pantry > .kitchen-actions {
+  position: sticky;
+  bottom: 0;
+  background: rgba(253, 246, 227, 0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  padding: 12px 8px;
+  margin: 8px -16px 0 -16px;
+  border-top: 1px solid var(--border);
+  z-index: 5;
+  width: calc(100% + 32px);
+  box-sizing: border-box;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pantry > .kitchen-actions {
+    background: rgba(31, 24, 16, 0.92);
+  }
+}
+
+.pantry-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-align: center;
+  font-style: italic;
+}
+
+.pantry-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 720px;
+}
+
+.pantry-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  min-width: 110px;
+  max-width: 140px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  color: var(--text-h);
+  font-family: inherit;
+}
+
+.pantry-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.pantry-item-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  transform: translateY(-2px);
+}
+
+.pantry-item-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.pantry-item-disabled:hover {
+  transform: none;
+  border-color: var(--border);
+}
+
+.pantry-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pantry-item-emoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.pantry-item-name {
+  font-size: 0.85rem;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.pantry-item-meta {
+  font-size: 0.72rem;
+  color: var(--text);
+  opacity: 0.85;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.pantry-item-macros {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pantry-item {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.budget-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  color: var(--text-h);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.budget-bar .budget-divider {
+  color: var(--text);
+  opacity: 0.4;
+}
+
+.budget-bar .budget-over {
+  color: #a83232;
+  font-weight: 700;
+}
+
+.budget-bar .budget-label {
+  font-size: 0.8rem;
+  color: var(--leaf);
+  font-style: italic;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .budget-bar {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .budget-bar .budget-over {
+    color: #e57373;
+  }
+}
+
+.meal-totals {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: var(--text-h);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meal-totals-label {
+  font-style: italic;
+  color: var(--text);
+  opacity: 0.85;
+  font-size: 0.78rem;
+}
+
+.meal-totals-cal {
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .meal-totals {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
