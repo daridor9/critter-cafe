@@ -13,6 +13,8 @@ type Props = {
   disableUnpackable: boolean
   /** Servings of this food still available to assign (stock minus reservations). */
   availableOf: (food: Food) => number
+  /** True if some owned units of this food spoil by tomorrow morning. */
+  useSoonOf: (food: Food) => boolean
   timeBudget: number
   totalMinutes: number
   overTime: boolean
@@ -27,7 +29,7 @@ type Props = {
 }
 
 export function PlanningView({
-  ariaLabel, homeKitchen, selectedFoodId, onSelectFood, disableUnpackable, availableOf,
+  ariaLabel, homeKitchen, selectedFoodId, onSelectFood, disableUnpackable, availableOf, useSoonOf,
   timeBudget, totalMinutes, overTime, budgetLabel,
   totals, hint, canServe, serveLabel, onServe, onBack, onMarket,
 }: Props) {
@@ -74,6 +76,7 @@ export function PlanningView({
             selected={selectedFoodId === food.id}
             unpackable={disableUnpackable && !food.packable}
             available={availableOf(food)}
+            useSoon={useSoonOf(food)}
             onSelect={() => onSelectFood(food.id)}
           />
         ))}
@@ -92,10 +95,11 @@ type PantryItemProps = {
   selected: boolean
   unpackable: boolean
   available: number
+  useSoon: boolean
   onSelect: () => void
 }
 
-function PantryItem({ food, selected, unpackable, available, onSelect }: PantryItemProps) {
+function PantryItem({ food, selected, unpackable, available, useSoon, onSelect }: PantryItemProps) {
   const outOfStock = available <= 0
   const disabled = unpackable || outOfStock
   const className = [
@@ -117,6 +121,9 @@ function PantryItem({ food, selected, unpackable, available, onSelect }: PantryI
         : `${food.name}, ${available} in pantry: ${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fat}g fat. Takes ${food.prepMinutes} minutes.`}
       title={title}>
       <span className="pantry-stock-badge" aria-hidden="true">×{available}</span>
+      {useSoon && available > 0 && (
+        <span className="pantry-use-soon" title="Spoils tomorrow — use it today!">⏳ use today!</span>
+      )}
       <span className="pantry-item-emoji" aria-hidden="true">{food.emoji}</span>
       <span className="pantry-item-name">{food.name}</span>
       <span className="pantry-item-meta" aria-hidden="true">🔥 {food.calories} cal · ⏱ {food.prepMinutes}m</span>

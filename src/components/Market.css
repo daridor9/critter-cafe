@@ -57,6 +57,44 @@
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid var(--border);
   border-radius: 12px;
+  position: relative;
+}
+
+.market-item-sale {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.market-sale-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.4px;
+}
+
+.market-price-old {
+  opacity: 0.55;
+}
+
+.market-price-sale {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.market-item-fresh {
+  font-size: 0.68rem;
+  color: var(--text);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.market-specials-note {
+  font-size: 0.8rem;
+  color: var(--text);
+  margin-left: 6px;
 }
 
 .market-item-emoji {

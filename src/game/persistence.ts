@@ -2,10 +2,14 @@ import type { FamilyMember } from '../family/types'
 import type { EnergyStatus } from '../family/energy'
 import { DEFAULT_MEAL_MINUTES, DEFAULT_DAILY_MONEY, type MealKey as BudgetKey } from '../food/budget'
 import type { KitchenId } from '../food/kitchens'
+import { findFoodById } from '../food/kitchens'
 import type { MealKey, ServedKey } from './meals'
+import type { StockBatches } from './economy'
 
 export type Plate = string[]  // food IDs
 export type MealAssignmentsMap = Record<MealKey, Record<string, Plate>>
+
+export type SpoilageReport = { day: number; items: { foodId: string; n: number; coinsWasted: number }[] }
 
 export type SavedState = {
   version: number
@@ -15,9 +19,10 @@ export type SavedState = {
   mealMinutes: Record<BudgetKey, number>
   dailyMoney: number
   wallet: number
-  stock: Record<string, number>          // foodId -> servings owned
-  dayStartWallet: number                  // snapshots for "reset day" rollback
-  dayStartStock: Record<string, number>
+  stockBatches: StockBatches
+  dayStartWallet: number
+  dayStartStockBatches: StockBatches
+  lastSpoilage: SpoilageReport | null
   family: FamilyMember[]
   kitchenId: KitchenId
   day: number
@@ -27,7 +32,7 @@ export type SavedState = {
 }
 
 const STORAGE_KEY = 'critter-cafe-state'
-const STORAGE_VERSION = 4
+const STORAGE_VERSION = 5
 
 export const emptyMealAssignments = (): MealAssignmentsMap =>
   ({ breakfast: {}, lunch: {}, snack: {}, dinner: {} })
@@ -35,9 +40,8 @@ export const emptyMealAssignments = (): MealAssignmentsMap =>
 export const initialServed = (): Record<ServedKey, boolean> =>
   ({ breakfast: false, schoolLunch: false, lunch: false, snack: false, dinner: false })
 
-/** v3 saves predate the market economy (per-meal coin budgets, no stock).
- *  Migrate what's precious — family, kitchen, day, tutorial, dex, carry-over —
- *  and start the current day fresh with an empty pantry and a full wallet. */
+// ---- migrations ----
+
 type SavedStateV3 = {
   version: number
   budgets?: Record<BudgetKey, { coins: number; minutes: number }>
@@ -68,8 +72,36 @@ function migrateV3(old: SavedStateV3): Partial<SavedState> {
     dailyMoney: DEFAULT_DAILY_MONEY,
     wallet: DEFAULT_DAILY_MONEY,
     dayStartWallet: DEFAULT_DAILY_MONEY,
-    stock: {},
-    dayStartStock: {},
+    stockBatches: {},
+    dayStartStockBatches: {},
+    lastSpoilage: null,
+  }
+}
+
+type SavedStateV4 = Omit<SavedState, 'stockBatches' | 'dayStartStockBatches' | 'lastSpoilage'> & {
+  stock?: Record<string, number>
+  dayStartStock?: Record<string, number>
+}
+
+/** v4 tracked plain counts; convert to batches bought "today" at base price. */
+function countsToBatches(counts: Record<string, number> | undefined, day: number): StockBatches {
+  const out: StockBatches = {}
+  for (const [foodId, n] of Object.entries(counts ?? {})) {
+    if (n <= 0) continue
+    const paid = findFoodById(foodId)?.cost ?? 1
+    out[foodId] = [{ day, n, paid }]
+  }
+  return out
+}
+
+function migrateV4(old: SavedStateV4): Partial<SavedState> {
+  const day = old.day ?? 1
+  const { stock, dayStartStock, ...rest } = old
+  return {
+    ...rest,
+    stockBatches: countsToBatches(stock, day),
+    dayStartStockBatches: countsToBatches(dayStartStock, day),
+    lastSpoilage: null,
   }
 }
 
@@ -79,6 +111,7 @@ export function loadSaved(): Partial<SavedState> {
     if (!raw) return {}
     const parsed = JSON.parse(raw) as SavedState
     if (parsed.version === STORAGE_VERSION) return parsed
+    if (parsed.version === 4) return migrateV4(parsed as unknown as SavedStateV4)
     if (parsed.version === 3) return migrateV3(parsed as unknown as SavedStateV3)
     return {}
   } catch { return {} }

@@ -13,6 +13,7 @@ type Props = {
   anythingServed: boolean
   wallet: number
   pantryEmpty: boolean
+  spoilageNote: string | null
   onMarket: () => void
   onEndOfDay: () => void
   onKitchenSelect: () => void
@@ -23,9 +24,12 @@ type Props = {
   onResetDay: () => void
 }
 
-export function Hub({ cards, anythingServed, wallet, pantryEmpty, onMarket, onEndOfDay, onKitchenSelect, onBudgets, onFamily, onDex, onTutorial, onResetDay }: Props) {
+export function Hub({ cards, anythingServed, wallet, pantryEmpty, spoilageNote, onMarket, onEndOfDay, onKitchenSelect, onBudgets, onFamily, onDex, onTutorial, onResetDay }: Props) {
   return (
     <section className="hub" aria-label="Kitchen menu">
+      {spoilageNote && (
+        <p className="hub-spoilage" role="status">{spoilageNote}</p>
+      )}
       <p className="hub-title">
         {pantryEmpty
           ? 'The pantry is empty — start at the market!'

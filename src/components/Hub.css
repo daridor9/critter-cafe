@@ -17,6 +17,26 @@
   font-style: italic;
 }
 
+.hub-spoilage {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #8a3e22;
+  background: rgba(199, 93, 58, 0.1);
+  border: 1px solid rgba(199, 93, 58, 0.35);
+  border-radius: 10px;
+  padding: 8px 14px;
+  text-align: center;
+  max-width: 48ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hub-spoilage {
+    color: #f0b89e;
+    background: rgba(232, 130, 96, 0.12);
+    border-color: rgba(232, 130, 96, 0.4);
+  }
+}
+
 .meal-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

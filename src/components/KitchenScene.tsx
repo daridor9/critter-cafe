@@ -4,7 +4,7 @@ import { STAGE_PROFILES, STAGE_DEFAULTS, MAX_FAMILY_SIZE } from '../family/stage
 import { computeDayEnergy, morningAfter, type EnergyStatus } from '../family/energy'
 import type { FamilyMember, LifeStage } from '../family/types'
 import type { Food, MealTone } from '../food/types'
-import { KITCHENS, DEFAULT_KITCHEN, findFoodById, type KitchenId } from '../food/kitchens'
+import { KITCHENS, DEFAULT_KITCHEN, ALL_FOODS, findFoodById, type KitchenId } from '../food/kitchens'
 import {
   DEFAULT_MEAL_MINUTES, DEFAULT_DAILY_MONEY, MONEY_LIMITS, MINUTES_LIMITS,
   type MealKey as BudgetKey,
@@ -14,8 +14,13 @@ import {
   type KitchenState, type MealKey, type ServedKey,
 } from '../game/meals'
 import {
+  ownedCount, totalUnits, addPurchase, removeNewest, consumeFIFO,
+  expireBatches, expiresTomorrow, specialsForDay, priceOf,
+  type StockBatches,
+} from '../game/economy'
+import {
   loadSaved, saveState, makeId, emptyMealAssignments, initialServed,
-  type MealAssignmentsMap, type Plate,
+  type MealAssignmentsMap, type Plate, type SpoilageReport,
 } from '../game/persistence'
 import { FamilyMember as FamilyMemberView } from './FamilyMember'
 import { Hub, type HubCard } from './Hub'
@@ -44,9 +49,10 @@ export function KitchenScene({ onExit }: Props) {
   const [mealMinutes, setMealMinutes] = useState<Record<BudgetKey, number>>(saved.mealMinutes ?? DEFAULT_MEAL_MINUTES)
   const [dailyMoney, setDailyMoney] = useState<number>(saved.dailyMoney ?? DEFAULT_DAILY_MONEY)
   const [wallet, setWallet] = useState<number>(saved.wallet ?? DEFAULT_DAILY_MONEY)
-  const [stock, setStock] = useState<Record<string, number>>(saved.stock ?? {})
+  const [stockBatches, setStockBatches] = useState<StockBatches>(saved.stockBatches ?? {})
   const [dayStartWallet, setDayStartWallet] = useState<number>(saved.dayStartWallet ?? saved.wallet ?? DEFAULT_DAILY_MONEY)
-  const [dayStartStock, setDayStartStock] = useState<Record<string, number>>(saved.dayStartStock ?? saved.stock ?? {})
+  const [dayStartStockBatches, setDayStartStockBatches] = useState<StockBatches>(saved.dayStartStockBatches ?? saved.stockBatches ?? {})
+  const [lastSpoilage, setLastSpoilage] = useState<SpoilageReport | null>(saved.lastSpoilage ?? null)
   const [family, setFamily] = useState<FamilyMember[]>(saved.family ?? defaultFamily)
   const [kitchenId, setKitchenId] = useState<KitchenId>(saved.kitchenId ?? DEFAULT_KITCHEN)
   const [day, setDay] = useState<number>(saved.day ?? 1)
@@ -58,11 +64,11 @@ export function KitchenScene({ onExit }: Props) {
   useEffect(() => {
     saveState({
       mealAssignments, schoolLunches, mealsServed, mealMinutes, dailyMoney,
-      wallet, stock, dayStartWallet, dayStartStock,
+      wallet, stockBatches, dayStartWallet, dayStartStockBatches, lastSpoilage,
       family, kitchenId, day, tutorialSeen, dexSeen, carryOver,
     })
   }, [mealAssignments, schoolLunches, mealsServed, mealMinutes, dailyMoney,
-      wallet, stock, dayStartWallet, dayStartStock,
+      wallet, stockBatches, dayStartWallet, dayStartStockBatches, lastSpoilage,
       family, kitchenId, day, tutorialSeen, dexSeen, carryOver])
 
   const kitchen = KITCHENS[kitchenId]
@@ -93,28 +99,31 @@ export function KitchenScene({ onExit }: Props) {
     }
     return n
   }
-  const availableOf = (foodId: string): number => (stock[foodId] ?? 0) - reservedCount(foodId)
+  const availableOf = (foodId: string): number => ownedCount(stockBatches, foodId) - reservedCount(foodId)
+
+  // Daily specials: deterministic from the day number.
+  const specials = specialsForDay(day, ALL_FOODS)
+  const priceOfFood = (food: Food): number => priceOf(food, specials)
 
   const buyFood = (food: Food) => {
-    if (wallet < food.cost) return
-    setWallet(w => w - food.cost)
-    setStock(prev => ({ ...prev, [food.id]: (prev[food.id] ?? 0) + 1 }))
+    const price = priceOfFood(food)
+    if (wallet < price) return
+    setWallet(w => w - price)
+    setStockBatches(prev => addPurchase(prev, food.id, day, price))
   }
   const sellFood = (food: Food) => {
-    if ((stock[food.id] ?? 0) <= reservedCount(food.id)) return
-    setWallet(w => w + food.cost)
-    setStock(prev => ({ ...prev, [food.id]: Math.max(0, (prev[food.id] ?? 0) - 1) }))
+    if (ownedCount(stockBatches, food.id) <= reservedCount(food.id)) return
+    const result = removeNewest(stockBatches, food.id)
+    if (!result) return
+    setStockBatches(result.next)
+    setWallet(w => w + result.refund)
   }
   const consumeStock = (ids: string[]) => {
     if (ids.length === 0) return
-    setStock(prev => {
-      const next = { ...prev }
-      for (const id of ids) next[id] = Math.max(0, (next[id] ?? 0) - 1)
-      return next
-    })
+    setStockBatches(prev => consumeFIFO(prev, ids))
   }
 
-  const totalStockUnits = Object.values(stock).reduce((s, n) => s + n, 0)
+  const totalStockUnits = totalUnits(stockBatches)
 
   // ---- per-character consumed foods (whole day) ----
   const consumedFoodsFor = (memberId: string): Food[] => {
@@ -220,7 +229,7 @@ export function KitchenScene({ onExit }: Props) {
   const resetDay = () => {
     clearDay()
     setWallet(dayStartWallet)
-    setStock({ ...dayStartStock })
+    setStockBatches(JSON.parse(JSON.stringify(dayStartStockBatches)))
     setState('hub')
   }
   const startNextDay = () => {
@@ -229,12 +238,19 @@ export function KitchenScene({ onExit }: Props) {
     for (const m of family) next[m.id] = computeDayEnergy(m, consumedFoodsFor(m.id)).status
     setCarryOver(next)
     clearDay()
+    // Overnight, anything past its shelf life spoils.
+    const newDay = day + 1
+    const { next: freshStock, spoiled } = expireBatches(stockBatches, newDay)
+    setStockBatches(freshStock)
+    setDayStartStockBatches(JSON.parse(JSON.stringify(freshStock)))
+    setLastSpoilage(spoiled.length > 0
+      ? { day: newDay, items: spoiled.map(s => ({ foodId: s.foodId, n: s.n, coinsWasted: s.coinsWasted })) }
+      : null)
     // Morning allowance lands; leftover money carries over.
     const newWallet = wallet + dailyMoney
     setWallet(newWallet)
     setDayStartWallet(newWallet)
-    setDayStartStock({ ...stock })
-    setDay(d => d + 1)
+    setDay(newDay)
     setState('hub')
   }
   // Home kitchen is a preference (header + default pantry tab) — meals mix
@@ -398,6 +414,11 @@ export function KitchenScene({ onExit }: Props) {
 
   const finishTutorial = () => { setTutorialSeen(true); setState('hub'); setTutorialStep(0) }
 
+  // Spoilage banner: only for the morning it happened.
+  const spoilageNote = (lastSpoilage && lastSpoilage.day === day && lastSpoilage.items.length > 0)
+    ? `🗑 Spoiled overnight: ${lastSpoilage.items.map(i => `${findFoodById(i.foodId)?.emoji ?? '🍽'}×${i.n}`).join(' ')} — ${lastSpoilage.items.reduce((s, i) => s + i.coinsWasted, 0)} coins wasted. Buy fresh food closer to when you'll cook it!`
+    : null
+
   return (
     <main className="kitchen-scene">
       <header className="kitchen-header">
@@ -433,6 +454,7 @@ export function KitchenScene({ onExit }: Props) {
         <Hub cards={hubCards} anythingServed={anythingServed}
           wallet={wallet}
           pantryEmpty={totalStockUnits === 0 && !anythingServed}
+          spoilageNote={spoilageNote}
           onMarket={() => setState('market')}
           onEndOfDay={() => setState('end-of-day')}
           onKitchenSelect={() => setState('kitchen-select')}
@@ -446,9 +468,11 @@ export function KitchenScene({ onExit }: Props) {
       {state === 'market' && (
         <Market
           wallet={wallet}
-          stock={stock}
           homeKitchen={kitchenId}
+          ownedOf={(id) => ownedCount(stockBatches, id)}
           reservedOf={reservedCount}
+          specials={specials}
+          priceOf={priceOfFood}
           onBuy={buyFood}
           onSell={sellFood}
           onBack={backToHub} />
@@ -462,6 +486,7 @@ export function KitchenScene({ onExit }: Props) {
           onSelectFood={setSelectedFoodId}
           disableUnpackable={isPackingSchoolLunch}
           availableOf={(food) => availableOf(food.id)}
+          useSoonOf={(food) => expiresTomorrow(stockBatches, food.id, day)}
           timeBudget={activeTimeBudget}
           totalMinutes={totalMinutes}
           overTime={overTime}
