@@ -1,12 +1,14 @@
+import { useState } from 'react'
 import type { Food } from '../food/types'
 import type { MealBudget } from '../food/budget'
+import { KITCHENS, type KitchenId } from '../food/kitchens'
 import './PlanningView.css'
 
 export type MealTotals = { calories: number; protein: number; carbs: number; fat: number }
 
 type Props = {
   ariaLabel: string
-  pantry: Food[]
+  homeKitchen: KitchenId
   selectedFoodId: string | null
   onSelectFood: (id: string) => void
   disableUnpackable: boolean
@@ -25,10 +27,16 @@ type Props = {
 }
 
 export function PlanningView({
-  ariaLabel, pantry, selectedFoodId, onSelectFood, disableUnpackable,
+  ariaLabel, homeKitchen, selectedFoodId, onSelectFood, disableUnpackable,
   budget, totalCost, totalMinutes, overBudget, overTime, budgetLabel,
   totals, hint, canServe, serveLabel, onServe, onBack,
 }: Props) {
+  // Mixing cuisines is real life: tabs flip between pantries mid-meal.
+  // Component remounts per planning session, so the tab opens on the
+  // player's home kitchen each time.
+  const [tab, setTab] = useState<KitchenId>(homeKitchen)
+  const pantry = KITCHENS[tab].pantry
+
   return (
     <section className="pantry" aria-label={ariaLabel}>
       <div className="budget-bar" aria-label="Budget tracker">
@@ -45,6 +53,21 @@ export function PlanningView({
         <span className="macro-pill macro-fat">F {totals.fat}g</span>
       </div>
       <p className="pantry-hint">{hint}</p>
+      <div className="pantry-tabs" role="tablist" aria-label="Kitchens">
+        {Object.values(KITCHENS).map(k => (
+          <button
+            key={k.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === k.id}
+            className={`pantry-tab ${tab === k.id ? 'pantry-tab-active' : ''}`}
+            onClick={() => setTab(k.id)}
+          >
+            <span aria-hidden="true">{k.emoji}</span>
+            <span className="pantry-tab-name">{k.name.replace(' Kitchen', '')}</span>
+          </button>
+        ))}
+      </div>
       <div className="pantry-row">
         {pantry.map(food => (
           <PantryItem

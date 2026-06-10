@@ -10,8 +10,8 @@ type Props = {
 export function KitchenSelect({ activeId, onSelect, onBack }: Props) {
   return (
     <section className="kitchen-select" aria-label="Choose a kitchen">
-      <h2 className="kitchen-select-title">🌍 Choose your kitchen</h2>
-      <p className="kitchen-select-hint">Each culture solved nutrition differently — all are healthy. Switching starts a fresh Day 1 with that kitchen's foods.</p>
+      <h2 className="kitchen-select-title">🌍 Choose your home kitchen</h2>
+      <p className="kitchen-select-hint">Each culture solved nutrition differently — all are healthy. Your home kitchen is the pantry tab that opens first when you plan a meal — but you can always mix foods from every kitchen, just like real life.</p>
       <div className="kitchen-cards">
         {(Object.values(KITCHENS) as Kitchen[]).map(k => (
           <button key={k.id} type="button" className={`kitchen-card ${k.id === activeId ? 'kitchen-card-active' : ''}`} onClick={() => onSelect(k.id)}>

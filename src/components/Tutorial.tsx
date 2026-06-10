@@ -11,7 +11,7 @@ const TUTORIAL_STEPS = [
   { title: 'Welcome to Critter Cafe!', body: 'You are the family nutritionist. Feed everyone right — the baby, the child, the adult, and the elder all have different needs.', emoji: '👨‍👩‍👧' },
   { title: 'Each meal has a budget', body: 'Money (💰 coins) and time (⏱ minutes). Pick foods within both. Foods are cheap, fast, or healthy — rarely all three.', emoji: '💰' },
   { title: 'Build plates with combos', body: 'Pick a food, tap a plate to add it. Tap again to remove. Combine items so each person gets enough calories and protein, carbs, and fat.', emoji: '🍽' },
-  { title: 'Make it yours', body: 'Add family members, switch between Mediterranean, East Asian, and Latin American kitchens, and play across many days. Everything saves automatically.', emoji: '🌍' },
+  { title: 'Make it yours', body: 'Add family members and mix foods from the Mediterranean, East Asian, Latin American, and Levantine kitchens in any meal — just like real life. Everything saves automatically.', emoji: '🌍' },
 ]
 
 export function Tutorial({ step, onNext, onSkip, onFinish }: Props) {

@@ -37,6 +37,61 @@
   font-style: italic;
 }
 
+.pantry-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pantry-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pantry-tab:hover {
+  border-color: var(--accent);
+}
+
+.pantry-tab-active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.pantry-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pantry-tab {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+@media (max-width: 540px) {
+  .pantry-tab {
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+  .pantry-tab .pantry-tab-name {
+    display: none;
+  }
+}
+
 .pantry-row {
   display: flex;
   gap: 8px;

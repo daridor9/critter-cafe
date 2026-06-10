@@ -46,3 +46,9 @@ export const KITCHENS: Record<KitchenId, Kitchen> = {
 }
 
 export const DEFAULT_KITCHEN: KitchenId = 'mediterranean'
+
+// Global food index — meals can mix foods from any kitchen, so lookups
+// must resolve across all pantries, not just the active one.
+export const ALL_FOODS: Food[] = Object.values(KITCHENS).flatMap(k => k.pantry)
+const FOOD_INDEX = new Map(ALL_FOODS.map(f => [f.id, f]))
+export const findFoodById = (id: string): Food | undefined => FOOD_INDEX.get(id)

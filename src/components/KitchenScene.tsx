@@ -4,7 +4,7 @@ import { STAGE_PROFILES, STAGE_DEFAULTS, MAX_FAMILY_SIZE } from '../family/stage
 import { computeDayEnergy, morningAfter, type EnergyStatus } from '../family/energy'
 import type { FamilyMember, LifeStage } from '../family/types'
 import type { Food, MealTone } from '../food/types'
-import { KITCHENS, DEFAULT_KITCHEN, type KitchenId } from '../food/kitchens'
+import { KITCHENS, DEFAULT_KITCHEN, findFoodById, type KitchenId } from '../food/kitchens'
 import { DEFAULT_BUDGETS, BUDGET_LIMITS, type MealBudget, type MealKey as BudgetKey } from '../food/budget'
 import {
   MEAL_CONFIG, currentMealKey, plateReaction, dayMarkerFor,
@@ -49,9 +49,9 @@ export function KitchenScene({ onExit }: Props) {
   }, [mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen, dexSeen, carryOver])
 
   const kitchen = KITCHENS[kitchenId]
-  const pantry = kitchen.pantry
+  // Meals can mix foods from any kitchen — resolve ids globally.
   const findFood = (id: string | null | undefined): Food | undefined =>
-    id ? pantry.find(f => f.id === id) : undefined
+    id ? findFoodById(id) : undefined
 
   const childMembers = family.filter(m => m.profile.lifeStage === 'child')
   const numChildren = Math.max(1, childMembers.length)
@@ -174,8 +174,10 @@ export function KitchenScene({ onExit }: Props) {
     setDay(d => d + 1)
     setState('hub')
   }
+  // Home kitchen is a preference now (header + default pantry tab) — since
+  // meals mix freely across cuisines, switching no longer resets the day.
   const switchKitchen = (id: KitchenId) => {
-    if (id !== kitchenId) { setKitchenId(id); clearDay(); setDay(1); setCarryOver({}) }
+    setKitchenId(id)
     setState('hub')
   }
 
@@ -369,7 +371,7 @@ export function KitchenScene({ onExit }: Props) {
       {(isPlanningMeal || isPackingSchoolLunch) && (
         <PlanningView
           ariaLabel={isPackingSchoolLunch ? 'School-lunch pantry' : `${currentConfig?.label} pantry`}
-          pantry={pantry}
+          homeKitchen={kitchenId}
           selectedFoodId={selectedFoodId}
           onSelectFood={setSelectedFoodId}
           disableUnpackable={isPackingSchoolLunch}
