@@ -5,7 +5,10 @@ import { computeDayEnergy, morningAfter, type EnergyStatus } from '../family/ene
 import type { FamilyMember, LifeStage } from '../family/types'
 import type { Food, MealTone } from '../food/types'
 import { KITCHENS, DEFAULT_KITCHEN, findFoodById, type KitchenId } from '../food/kitchens'
-import { DEFAULT_BUDGETS, BUDGET_LIMITS, type MealBudget, type MealKey as BudgetKey } from '../food/budget'
+import {
+  DEFAULT_MEAL_MINUTES, DEFAULT_DAILY_MONEY, MONEY_LIMITS, MINUTES_LIMITS,
+  type MealKey as BudgetKey,
+} from '../food/budget'
 import {
   MEAL_CONFIG, currentMealKey, plateReaction, dayMarkerFor,
   type KitchenState, type MealKey, type ServedKey,
@@ -16,6 +19,7 @@ import {
 } from '../game/persistence'
 import { FamilyMember as FamilyMemberView } from './FamilyMember'
 import { Hub, type HubCard } from './Hub'
+import { Market } from './Market'
 import { PlanningView } from './PlanningView'
 import { EndOfDayReport } from './EndOfDayReport'
 import { BudgetSettings } from './BudgetSettings'
@@ -27,6 +31,8 @@ import './KitchenScene.css'
 
 type Props = { onExit: () => void }
 
+const MEAL_KEYS: MealKey[] = ['breakfast', 'lunch', 'snack', 'dinner']
+
 export function KitchenScene({ onExit }: Props) {
   const saved = loadSaved()
 
@@ -35,7 +41,12 @@ export function KitchenScene({ onExit }: Props) {
   const [mealAssignments, setMealAssignments] = useState<MealAssignmentsMap>(saved.mealAssignments ?? emptyMealAssignments())
   const [schoolLunches, setSchoolLunches] = useState<Record<string, Plate>>(saved.schoolLunches ?? {})
   const [mealsServed, setMealsServed] = useState<Record<ServedKey, boolean>>(saved.mealsServed ?? initialServed())
-  const [budgets, setBudgets] = useState<Record<BudgetKey, MealBudget>>(saved.budgets ?? DEFAULT_BUDGETS)
+  const [mealMinutes, setMealMinutes] = useState<Record<BudgetKey, number>>(saved.mealMinutes ?? DEFAULT_MEAL_MINUTES)
+  const [dailyMoney, setDailyMoney] = useState<number>(saved.dailyMoney ?? DEFAULT_DAILY_MONEY)
+  const [wallet, setWallet] = useState<number>(saved.wallet ?? DEFAULT_DAILY_MONEY)
+  const [stock, setStock] = useState<Record<string, number>>(saved.stock ?? {})
+  const [dayStartWallet, setDayStartWallet] = useState<number>(saved.dayStartWallet ?? saved.wallet ?? DEFAULT_DAILY_MONEY)
+  const [dayStartStock, setDayStartStock] = useState<Record<string, number>>(saved.dayStartStock ?? saved.stock ?? {})
   const [family, setFamily] = useState<FamilyMember[]>(saved.family ?? defaultFamily)
   const [kitchenId, setKitchenId] = useState<KitchenId>(saved.kitchenId ?? DEFAULT_KITCHEN)
   const [day, setDay] = useState<number>(saved.day ?? 1)
@@ -45,8 +56,14 @@ export function KitchenScene({ onExit }: Props) {
   const [carryOver, setCarryOver] = useState<Record<string, EnergyStatus>>(saved.carryOver ?? {})
 
   useEffect(() => {
-    saveState({ mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen, dexSeen, carryOver })
-  }, [mealAssignments, schoolLunches, mealsServed, budgets, family, kitchenId, day, tutorialSeen, dexSeen, carryOver])
+    saveState({
+      mealAssignments, schoolLunches, mealsServed, mealMinutes, dailyMoney,
+      wallet, stock, dayStartWallet, dayStartStock,
+      family, kitchenId, day, tutorialSeen, dexSeen, carryOver,
+    })
+  }, [mealAssignments, schoolLunches, mealsServed, mealMinutes, dailyMoney,
+      wallet, stock, dayStartWallet, dayStartStock,
+      family, kitchenId, day, tutorialSeen, dexSeen, carryOver])
 
   const kitchen = KITCHENS[kitchenId]
   // Meals can mix foods from any kitchen — resolve ids globally.
@@ -60,6 +77,44 @@ export function KitchenScene({ onExit }: Props) {
     (mealAssignments[mealKey]?.[memberId] ?? []).map(findFood).filter((f): f is Food => Boolean(f))
   const schoolLunchFoodsFor = (memberId: string): Food[] =>
     (schoolLunches[memberId] ?? []).map(findFood).filter((f): f is Food => Boolean(f))
+
+  // ---- stock & reservations ----
+  // Stock is consumed when a meal is SERVED. While planning, units sitting
+  // on unserved plates are "reserved": still in the pantry, but not
+  // assignable twice.
+  const reservedCount = (foodId: string): number => {
+    let n = 0
+    for (const mk of MEAL_KEYS) {
+      if (mealsServed[mk]) continue
+      for (const m of family) n += (mealAssignments[mk]?.[m.id] ?? []).filter(id => id === foodId).length
+    }
+    if (!mealsServed.schoolLunch) {
+      for (const c of childMembers) n += (schoolLunches[c.id] ?? []).filter(id => id === foodId).length
+    }
+    return n
+  }
+  const availableOf = (foodId: string): number => (stock[foodId] ?? 0) - reservedCount(foodId)
+
+  const buyFood = (food: Food) => {
+    if (wallet < food.cost) return
+    setWallet(w => w - food.cost)
+    setStock(prev => ({ ...prev, [food.id]: (prev[food.id] ?? 0) + 1 }))
+  }
+  const sellFood = (food: Food) => {
+    if ((stock[food.id] ?? 0) <= reservedCount(food.id)) return
+    setWallet(w => w + food.cost)
+    setStock(prev => ({ ...prev, [food.id]: Math.max(0, (prev[food.id] ?? 0) - 1) }))
+  }
+  const consumeStock = (ids: string[]) => {
+    if (ids.length === 0) return
+    setStock(prev => {
+      const next = { ...prev }
+      for (const id of ids) next[id] = Math.max(0, (next[id] ?? 0) - 1)
+      return next
+    })
+  }
+
+  const totalStockUnits = Object.values(stock).reduce((s, n) => s + n, 0)
 
   // ---- per-character consumed foods (whole day) ----
   const consumedFoodsFor = (memberId: string): Food[] => {
@@ -101,25 +156,18 @@ export function KitchenScene({ onExit }: Props) {
   const isPlanningMeal = currentMeal !== null
   const isPackingSchoolLunch = state === 'packing-school-lunch'
 
-  // School-lunch budget scales with number of children.
-  const scaledSchoolBudget: MealBudget = {
-    coins: budgets.schoolLunch.coins * numChildren,
-    minutes: budgets.schoolLunch.minutes * numChildren,
-  }
-  const activeBudget = isPackingSchoolLunch ? scaledSchoolBudget : (currentMeal ? budgets[currentMeal] : budgets.breakfast)
+  // ---- time budget (cooking costs time; money was spent at the market) ----
+  const activeTimeBudget = isPackingSchoolLunch
+    ? mealMinutes.schoolLunch * numChildren
+    : (currentMeal ? mealMinutes[currentMeal] : mealMinutes.breakfast)
 
-  const sumPlate = (foods: Food[], field: 'cost' | 'prepMinutes' | 'calories' | 'protein' | 'carbs' | 'fat'): number =>
+  const sumPlate = (foods: Food[], field: 'prepMinutes' | 'calories' | 'protein' | 'carbs' | 'fat'): number =>
     foods.reduce((s, f) => s + (f[field] ?? 0), 0)
 
-  const mealTotalCost = currentMeal ? currentPlateMembers.reduce((s, m) => s + sumPlate(foodsOnPlate(currentMeal, m.id), 'cost'), 0) : 0
-  const mealTotalMinutes = currentMeal ? currentPlateMembers.reduce((s, m) => s + sumPlate(foodsOnPlate(currentMeal, m.id), 'prepMinutes'), 0) : 0
-  const schoolTotalCost = childMembers.reduce((s, m) => s + sumPlate(schoolLunchFoodsFor(m.id), 'cost'), 0)
-  const schoolTotalMinutes = childMembers.reduce((s, m) => s + sumPlate(schoolLunchFoodsFor(m.id), 'prepMinutes'), 0)
-
-  const totalCost = isPackingSchoolLunch ? schoolTotalCost : mealTotalCost
-  const totalMinutes = isPackingSchoolLunch ? schoolTotalMinutes : mealTotalMinutes
-  const overBudget = totalCost > activeBudget.coins
-  const overTime = totalMinutes > activeBudget.minutes
+  const totalMinutes = isPackingSchoolLunch
+    ? childMembers.reduce((s, m) => s + sumPlate(schoolLunchFoodsFor(m.id), 'prepMinutes'), 0)
+    : (currentMeal ? currentPlateMembers.reduce((s, m) => s + sumPlate(foodsOnPlate(currentMeal, m.id), 'prepMinutes'), 0) : 0)
+  const overTime = totalMinutes > activeTimeBudget
 
   const sumAllField = (field: 'calories' | 'protein' | 'carbs' | 'fat'): number => {
     if (isPackingSchoolLunch) return childMembers.reduce((s, m) => s + sumPlate(schoolLunchFoodsFor(m.id), field), 0)
@@ -135,9 +183,9 @@ export function KitchenScene({ onExit }: Props) {
 
   const allRequiredAssigned = currentRequiredMembers.every(m => (mealAssignments[currentMeal!]?.[m.id]?.length ?? 0) > 0)
   const anyPlateFilled = currentMeal ? currentPlateMembers.some(m => (mealAssignments[currentMeal]?.[m.id]?.length ?? 0) > 0) : false
-  const canServeMeal = (currentConfig?.key === 'snack' ? anyPlateFilled : allRequiredAssigned) && !overBudget && !overTime
+  const canServeMeal = (currentConfig?.key === 'snack' ? anyPlateFilled : allRequiredAssigned) && !overTime
   const anySchoolLunchFilled = childMembers.some(m => (schoolLunches[m.id]?.length ?? 0) > 0)
-  const canPackSchoolLunch = anySchoolLunchFilled && !overBudget && !overTime
+  const canPackSchoolLunch = anySchoolLunchFilled && !overTime
 
   // ---- transitions ----
   const startPlanning = (mealKey: MealKey) => { setState(MEAL_CONFIG[mealKey].planState); setSelectedFoodId(null) }
@@ -147,12 +195,16 @@ export function KitchenScene({ onExit }: Props) {
   }
   const serveMeal = () => {
     if (!currentConfig || !currentMeal) return
-    discoverFoods(currentPlateMembers.flatMap(m => mealAssignments[currentMeal]?.[m.id] ?? []))
+    const ids = currentPlateMembers.flatMap(m => mealAssignments[currentMeal]?.[m.id] ?? [])
+    discoverFoods(ids)
+    consumeStock(ids)
     setMealsServed(p => ({ ...p, [currentConfig.key]: true }))
     setState('hub'); setSelectedFoodId(null)
   }
   const packSchoolLunch = () => {
-    discoverFoods(childMembers.flatMap(m => schoolLunches[m.id] ?? []))
+    const ids = childMembers.flatMap(m => schoolLunches[m.id] ?? [])
+    discoverFoods(ids)
+    consumeStock(ids)
     setMealsServed(p => ({ ...p, schoolLunch: true }))
     setState('hub'); setSelectedFoodId(null)
   }
@@ -164,18 +216,29 @@ export function KitchenScene({ onExit }: Props) {
     setMealsServed(initialServed())
     setSelectedFoodId(null)
   }
-  const resetDay = () => { clearDay(); setState('hub') }
+  // Reset day = roll back the whole day's transaction: meals, stock, wallet.
+  const resetDay = () => {
+    clearDay()
+    setWallet(dayStartWallet)
+    setStock({ ...dayStartStock })
+    setState('hub')
+  }
   const startNextDay = () => {
     // Yesterday's eating becomes today's morning state.
     const next: Record<string, EnergyStatus> = {}
     for (const m of family) next[m.id] = computeDayEnergy(m, consumedFoodsFor(m.id)).status
     setCarryOver(next)
     clearDay()
+    // Morning allowance lands; leftover money carries over.
+    const newWallet = wallet + dailyMoney
+    setWallet(newWallet)
+    setDayStartWallet(newWallet)
+    setDayStartStock({ ...stock })
     setDay(d => d + 1)
     setState('hub')
   }
-  // Home kitchen is a preference now (header + default pantry tab) — since
-  // meals mix freely across cuisines, switching no longer resets the day.
+  // Home kitchen is a preference (header + default pantry tab) — meals mix
+  // freely across cuisines, so switching never resets anything.
   const switchKitchen = (id: KitchenId) => {
     setKitchenId(id)
     setState('hub')
@@ -186,28 +249,28 @@ export function KitchenScene({ onExit }: Props) {
     const member = family.find(m => m.id === memberId)
     if (!member) return
     if (isPlanningMeal && currentMeal && currentConfig?.hasPlate(member)) {
-      setMealAssignments(prev => {
-        const cur = prev[currentMeal]?.[memberId] ?? []
-        const next = cur.includes(selectedFoodId) ? cur.filter(id => id !== selectedFoodId) : [...cur, selectedFoodId]
-        return { ...prev, [currentMeal]: { ...prev[currentMeal], [memberId]: next } }
-      })
+      const cur = mealAssignments[currentMeal]?.[memberId] ?? []
+      const removing = cur.includes(selectedFoodId)
+      if (!removing && availableOf(selectedFoodId) <= 0) return
+      const next = removing ? cur.filter(id => id !== selectedFoodId) : [...cur, selectedFoodId]
+      setMealAssignments(prev => ({ ...prev, [currentMeal]: { ...prev[currentMeal], [memberId]: next } }))
     } else if (isPackingSchoolLunch && member.profile.lifeStage === 'child') {
       const food = findFood(selectedFoodId)
-      if (food?.packable) {
-        setSchoolLunches(prev => {
-          const cur = prev[memberId] ?? []
-          const next = cur.includes(selectedFoodId) ? cur.filter(id => id !== selectedFoodId) : [...cur, selectedFoodId]
-          return { ...prev, [memberId]: next }
-        })
-      }
+      if (!food?.packable) return
+      const cur = schoolLunches[memberId] ?? []
+      const removing = cur.includes(selectedFoodId)
+      if (!removing && availableOf(selectedFoodId) <= 0) return
+      const next = removing ? cur.filter(id => id !== selectedFoodId) : [...cur, selectedFoodId]
+      setSchoolLunches(prev => ({ ...prev, [memberId]: next }))
     }
   }
 
-  // ---- budgets ----
-  const updateBudget = (key: BudgetKey, field: 'coins' | 'minutes', delta: number) => {
-    const limits = BUDGET_LIMITS[field]
-    setBudgets(prev => ({ ...prev, [key]: { ...prev[key], [field]: Math.max(limits.min, Math.min(limits.max, prev[key][field] + delta)) } }))
-  }
+  // ---- settings ----
+  const updateDailyMoney = (delta: number) =>
+    setDailyMoney(v => Math.max(MONEY_LIMITS.min, Math.min(MONEY_LIMITS.max, v + delta)))
+  const updateMealMinutes = (key: BudgetKey, delta: number) =>
+    setMealMinutes(prev => ({ ...prev, [key]: Math.max(MINUTES_LIMITS.min, Math.min(MINUTES_LIMITS.max, prev[key] + delta)) }))
+  const resetBudgets = () => { setMealMinutes(DEFAULT_MEAL_MINUTES); setDailyMoney(DEFAULT_DAILY_MONEY) }
 
   // ---- family ----
   const updateFamilyMember = (id: string, patch: Partial<{ name: string; emoji: string }>) =>
@@ -278,10 +341,16 @@ export function KitchenScene({ onExit }: Props) {
 
   // ---- hint ----
   const planningHint = (() => {
+    if (!isPlanningMeal && !isPackingSchoolLunch) return ''
+    if (totalStockUnits === 0 && !anyPlateFilled && !anySchoolLunchFilled) {
+      return 'Your pantry is empty — visit the 🛒 Market first.'
+    }
+    const selected = findFood(selectedFoodId)
     if (isPlanningMeal && currentConfig) {
-      if (overBudget && overTime) return `Over budget AND over time — swap for cheaper/faster, or raise the budget in ⚙ settings.`
-      if (overBudget) return `Over budget — try cheaper picks, or raise it in ⚙ settings.`
       if (overTime) return `Over time — try faster picks, or raise it in ⚙ settings.`
+      if (selected && availableOf(selected.id) <= 0 && !anyPlateHasSelected()) {
+        return `No more ${selected.name} in the pantry — pick another food or buy more at the 🛒 Market.`
+      }
       if (currentConfig.key === 'snack' && !anyPlateFilled) return 'Pick a food and tap a plate. Snacks are optional — fill the plates of whoever wants one.'
       if (!allRequiredAssigned && selectedFoodId) return `Tap a plate to add this food (tap it again on a plate to remove).`
       if (currentConfig.key !== 'snack' && !allRequiredAssigned) {
@@ -293,18 +362,21 @@ export function KitchenScene({ onExit }: Props) {
       }
       return `Looks good — add more items to a plate, or serve ${currentConfig.label} when ready.`
     }
-    if (isPackingSchoolLunch) {
-      const selected = findFood(selectedFoodId)
-      if (overBudget && overTime) return "Too expensive AND too slow for the lunchboxes."
-      if (overBudget) return "Too expensive for the lunchboxes."
-      if (overTime) return "Too slow to prep before school."
-      if (selected && !selected.packable) return "That won't travel well — pick something packable."
-      if (!anySchoolLunchFilled && selectedFoodId) return "Tap a child's lunchbox to pack it (multiple items welcome)."
-      if (!anySchoolLunchFilled) return "Pick something packable for the kids' school lunches."
-      return 'Looks good — add more, or pack it when ready.'
-    }
-    return ''
+    // school lunch packing
+    if (overTime) return "Too slow to prep before school."
+    if (selected && !selected.packable) return "That won't travel well — pick something packable."
+    if (!anySchoolLunchFilled && selectedFoodId) return "Tap a child's lunchbox to pack it (multiple items welcome)."
+    if (!anySchoolLunchFilled) return "Pick something packable for the kids' school lunches."
+    return 'Looks good — add more, or pack it when ready.'
   })()
+
+  function anyPlateHasSelected(): boolean {
+    if (!selectedFoodId) return false
+    if (currentMeal) {
+      return currentPlateMembers.some(m => (mealAssignments[currentMeal]?.[m.id] ?? []).includes(selectedFoodId))
+    }
+    return childMembers.some(c => (schoolLunches[c.id] ?? []).includes(selectedFoodId))
+  }
 
   const anythingServed = Object.values(mealsServed).some(Boolean)
   const showCalories = anythingServed || state === 'end-of-day'
@@ -336,7 +408,7 @@ export function KitchenScene({ onExit }: Props) {
         </button>
         <div className="header-center">
           <span className="day-marker">Day {day} · {dayMarkerFor(state)}</span>
-          <span className="kitchen-subtitle">{kitchen.name} {kitchen.emoji}</span>
+          <span className="kitchen-subtitle">{kitchen.name} {kitchen.emoji} · 💰 {wallet}</span>
         </div>
         <button type="button" className="brand-mark brand-mark-button" onClick={onExit} aria-label="Back to title screen">Critter Cafe</button>
       </header>
@@ -359,6 +431,9 @@ export function KitchenScene({ onExit }: Props) {
 
       {state === 'hub' && (
         <Hub cards={hubCards} anythingServed={anythingServed}
+          wallet={wallet}
+          pantryEmpty={totalStockUnits === 0 && !anythingServed}
+          onMarket={() => setState('market')}
           onEndOfDay={() => setState('end-of-day')}
           onKitchenSelect={() => setState('kitchen-select')}
           onBudgets={() => setState('budgets')}
@@ -368,6 +443,17 @@ export function KitchenScene({ onExit }: Props) {
           onResetDay={resetDay} />
       )}
 
+      {state === 'market' && (
+        <Market
+          wallet={wallet}
+          stock={stock}
+          homeKitchen={kitchenId}
+          reservedOf={reservedCount}
+          onBuy={buyFood}
+          onSell={sellFood}
+          onBack={backToHub} />
+      )}
+
       {(isPlanningMeal || isPackingSchoolLunch) && (
         <PlanningView
           ariaLabel={isPackingSchoolLunch ? 'School-lunch pantry' : `${currentConfig?.label} pantry`}
@@ -375,15 +461,17 @@ export function KitchenScene({ onExit }: Props) {
           selectedFoodId={selectedFoodId}
           onSelectFood={setSelectedFoodId}
           disableUnpackable={isPackingSchoolLunch}
-          budget={activeBudget}
-          totalCost={totalCost} totalMinutes={totalMinutes}
-          overBudget={overBudget} overTime={overTime}
+          availableOf={(food) => availableOf(food.id)}
+          timeBudget={activeTimeBudget}
+          totalMinutes={totalMinutes}
+          overTime={overTime}
           budgetLabel={isPackingSchoolLunch ? `🎒 ${numChildren} lunchbox${numChildren > 1 ? 'es' : ''}` : `${currentConfig?.emoji} ${currentConfig?.label}`}
           totals={mealTotals}
           hint={planningHint}
           canServe={isPackingSchoolLunch ? canPackSchoolLunch : canServeMeal}
           serveLabel={isPackingSchoolLunch ? '🎒 Pack lunches' : (currentConfig?.serveLabel ?? 'Serve')}
           onServe={isPackingSchoolLunch ? packSchoolLunch : serveMeal}
+          onMarket={() => setState('market')}
           onBack={backToHub} />
       )}
 
@@ -401,8 +489,9 @@ export function KitchenScene({ onExit }: Props) {
       )}
 
       {state === 'budgets' && (
-        <BudgetSettings budgets={budgets} onUpdate={updateBudget}
-          onReset={() => setBudgets(DEFAULT_BUDGETS)} onBack={backToHub} />
+        <BudgetSettings dailyMoney={dailyMoney} mealMinutes={mealMinutes}
+          onUpdateMoney={updateDailyMoney} onUpdateMinutes={updateMealMinutes}
+          onReset={resetBudgets} onBack={backToHub} />
       )}
 
       {state === 'family-settings' && (
@@ -416,8 +505,9 @@ export function KitchenScene({ onExit }: Props) {
       )}
 
       <footer className="kitchen-footer">
-        {state === 'hub' && <p><em>Pick any meal. Build combo plates, add family, switch kitchens — your progress saves automatically.</em></p>}
-        {(isPlanningMeal || isPackingSchoolLunch) && <p><em>Green = ideal · yellow = okay · orange or red = wrong fit. Tap a food twice on one plate to remove it.</em></p>}
+        {state === 'hub' && <p><em>Shop at the market, build combo plates from any cuisine, and keep everyone fueled. Leftover coins carry over to tomorrow.</em></p>}
+        {state === 'market' && <p><em>Cheap staples fill bellies; pricier fresh foods balance them. You can return unused food for a full refund.</em></p>}
+        {(isPlanningMeal || isPackingSchoolLunch) && <p><em>Green = ideal · yellow = okay · orange or red = wrong fit. ×N shows how many servings you own.</em></p>}
       </footer>
     </main>
   )

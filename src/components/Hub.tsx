@@ -11,6 +11,9 @@ export type HubCard = {
 type Props = {
   cards: HubCard[]
   anythingServed: boolean
+  wallet: number
+  pantryEmpty: boolean
+  onMarket: () => void
   onEndOfDay: () => void
   onKitchenSelect: () => void
   onBudgets: () => void
@@ -20,14 +23,19 @@ type Props = {
   onResetDay: () => void
 }
 
-export function Hub({ cards, anythingServed, onEndOfDay, onKitchenSelect, onBudgets, onFamily, onDex, onTutorial, onResetDay }: Props) {
+export function Hub({ cards, anythingServed, wallet, pantryEmpty, onMarket, onEndOfDay, onKitchenSelect, onBudgets, onFamily, onDex, onTutorial, onResetDay }: Props) {
   return (
     <section className="hub" aria-label="Kitchen menu">
-      <p className="hub-title">What would you like to plan?</p>
+      <p className="hub-title">
+        {pantryEmpty
+          ? 'The pantry is empty — start at the market!'
+          : 'What would you like to plan?'}
+      </p>
       <div className="meal-cards">
         {cards.map(card => <MealCard key={card.name} {...card} />)}
       </div>
       <div className="kitchen-actions hub-actions">
+        <button type="button" className="primary-action" onClick={onMarket}>🛒 Market · 💰 {wallet}</button>
         <button type="button" className="primary-action" onClick={onEndOfDay}>🌙 See end of day</button>
         <button type="button" className="secondary-action" onClick={onKitchenSelect}>🌍 Switch kitchen</button>
         <button type="button" className="secondary-action" onClick={onBudgets}>⚙ Adjust budgets</button>

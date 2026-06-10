@@ -6,7 +6,7 @@ export type MealKey = 'breakfast' | 'lunch' | 'snack' | 'dinner'
 export type ServedKey = MealKey | 'schoolLunch'
 
 export type KitchenState =
-  | 'hub'
+  | 'hub' | 'market'
   | 'planning-breakfast' | 'packing-school-lunch' | 'planning-lunch' | 'planning-snack' | 'planning-dinner'
   | 'end-of-day' | 'budgets' | 'family-settings' | 'kitchen-select' | 'nutrient-dex' | 'tutorial'
 
@@ -81,6 +81,7 @@ export function plateReaction(member: FamilyMember, foods: Food[]): MealReaction
 
 export function dayMarkerFor(state: KitchenState): string {
   if (state === 'hub') return 'Kitchen'
+  if (state === 'market') return '🛒 Market'
   if (state === 'planning-breakfast') return '🍳 Breakfast'
   if (state === 'packing-school-lunch') return '🎒 School lunch'
   if (state === 'planning-lunch') return '🥗 Midday lunch'

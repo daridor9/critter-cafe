@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { Food } from '../food/types'
-import type { MealBudget } from '../food/budget'
 import { KITCHENS, type KitchenId } from '../food/kitchens'
 import './PlanningView.css'
 
@@ -12,10 +11,10 @@ type Props = {
   selectedFoodId: string | null
   onSelectFood: (id: string) => void
   disableUnpackable: boolean
-  budget: MealBudget
-  totalCost: number
+  /** Servings of this food still available to assign (stock minus reservations). */
+  availableOf: (food: Food) => number
+  timeBudget: number
   totalMinutes: number
-  overBudget: boolean
   overTime: boolean
   budgetLabel: string
   totals: MealTotals
@@ -24,12 +23,13 @@ type Props = {
   serveLabel: string
   onServe: () => void
   onBack: () => void
+  onMarket: () => void
 }
 
 export function PlanningView({
-  ariaLabel, homeKitchen, selectedFoodId, onSelectFood, disableUnpackable,
-  budget, totalCost, totalMinutes, overBudget, overTime, budgetLabel,
-  totals, hint, canServe, serveLabel, onServe, onBack,
+  ariaLabel, homeKitchen, selectedFoodId, onSelectFood, disableUnpackable, availableOf,
+  timeBudget, totalMinutes, overTime, budgetLabel,
+  totals, hint, canServe, serveLabel, onServe, onBack, onMarket,
 }: Props) {
   // Mixing cuisines is real life: tabs flip between pantries mid-meal.
   // Component remounts per planning session, so the tab opens on the
@@ -40,9 +40,7 @@ export function PlanningView({
   return (
     <section className="pantry" aria-label={ariaLabel}>
       <div className="budget-bar" aria-label="Budget tracker">
-        <span className={overBudget ? 'budget-over' : ''}>💰 {totalCost} / {budget.coins}</span>
-        <span className="budget-divider" aria-hidden="true">·</span>
-        <span className={overTime ? 'budget-over' : ''}>⏱ {totalMinutes} / {budget.minutes} min</span>
+        <span className={overTime ? 'budget-over' : ''}>⏱ {totalMinutes} / {timeBudget} min</span>
         <span className="budget-label">{budgetLabel}</span>
       </div>
       <div className="meal-totals" aria-label="Meal nutrition totals">
@@ -74,33 +72,54 @@ export function PlanningView({
             key={food.id}
             food={food}
             selected={selectedFoodId === food.id}
-            disabled={disableUnpackable && !food.packable}
+            unpackable={disableUnpackable && !food.packable}
+            available={availableOf(food)}
             onSelect={() => onSelectFood(food.id)}
           />
         ))}
       </div>
       <div className="kitchen-actions">
         <button type="button" className="primary-action" onClick={onServe} disabled={!canServe}>{serveLabel}</button>
+        <button type="button" className="secondary-action" onClick={onMarket}>🛒 Market</button>
         <button type="button" className="secondary-action" onClick={onBack}>← Back to kitchen</button>
       </div>
     </section>
   )
 }
 
-type PantryItemProps = { food: Food; selected: boolean; disabled: boolean; onSelect: () => void }
+type PantryItemProps = {
+  food: Food
+  selected: boolean
+  unpackable: boolean
+  available: number
+  onSelect: () => void
+}
 
-function PantryItem({ food, selected, disabled, onSelect }: PantryItemProps) {
-  const className = ['pantry-item', selected ? 'pantry-item-selected' : '', disabled ? 'pantry-item-disabled' : ''].filter(Boolean).join(' ')
+function PantryItem({ food, selected, unpackable, available, onSelect }: PantryItemProps) {
+  const outOfStock = available <= 0
+  const disabled = unpackable || outOfStock
+  const className = [
+    'pantry-item',
+    selected ? 'pantry-item-selected' : '',
+    disabled ? 'pantry-item-disabled' : '',
+  ].filter(Boolean).join(' ')
+
+  const title = unpackable ? "Doesn't travel well in a lunchbox"
+    : outOfStock ? 'Out of stock — visit the 🛒 Market'
+    : undefined
+
   return (
     <button type="button" className={className}
       onClick={() => !disabled && onSelect()} disabled={disabled}
       aria-pressed={selected}
-      aria-label={disabled ? `${food.name} — doesn't travel well, can't pack`
-        : `${food.name}: ${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fat}g fat. Costs ${food.cost} coins, takes ${food.prepMinutes} minutes.`}
-      title={disabled ? "Doesn't travel well in a lunchbox" : undefined}>
+      aria-label={unpackable ? `${food.name} — doesn't travel well, can't pack`
+        : outOfStock ? `${food.name} — out of stock, buy more at the market`
+        : `${food.name}, ${available} in pantry: ${food.calories} calories, ${food.protein}g protein, ${food.carbs}g carbs, ${food.fat}g fat. Takes ${food.prepMinutes} minutes.`}
+      title={title}>
+      <span className="pantry-stock-badge" aria-hidden="true">×{available}</span>
       <span className="pantry-item-emoji" aria-hidden="true">{food.emoji}</span>
       <span className="pantry-item-name">{food.name}</span>
-      <span className="pantry-item-meta" aria-hidden="true">🔥 {food.calories} cal · 💰 {food.cost} · ⏱ {food.prepMinutes}m</span>
+      <span className="pantry-item-meta" aria-hidden="true">🔥 {food.calories} cal · ⏱ {food.prepMinutes}m</span>
       <span className="pantry-item-macros" aria-hidden="true">
         <span className="macro-pill macro-protein">P {food.protein}g</span>
         <span className="macro-pill macro-carbs">C {food.carbs}g</span>

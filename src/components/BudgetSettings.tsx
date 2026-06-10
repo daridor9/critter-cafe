@@ -1,35 +1,41 @@
-import type { MealBudget, MealKey as BudgetKey } from '../food/budget'
-import { BUDGET_LIMITS } from '../food/budget'
+import { MONEY_LIMITS, MINUTES_LIMITS, type MealKey as BudgetKey } from '../food/budget'
 import { BUDGET_LABELS } from '../game/meals'
 import './BudgetSettings.css'
 
 type Props = {
-  budgets: Record<BudgetKey, MealBudget>
-  onUpdate: (key: BudgetKey, field: 'coins' | 'minutes', delta: number) => void
+  dailyMoney: number
+  mealMinutes: Record<BudgetKey, number>
+  onUpdateMoney: (delta: number) => void
+  onUpdateMinutes: (key: BudgetKey, delta: number) => void
   onReset: () => void
   onBack: () => void
 }
 
 const BUDGET_ORDER: BudgetKey[] = ['breakfast', 'schoolLunch', 'lunch', 'snack', 'dinner']
 
-export function BudgetSettings({ budgets, onUpdate, onReset, onBack }: Props) {
+export function BudgetSettings({ dailyMoney, mealMinutes, onUpdateMoney, onUpdateMinutes, onReset, onBack }: Props) {
   return (
-    <section className="budget-settings" aria-label="Budget settings">
-      <h2 className="budget-settings-title">⚙ Adjust your daily budgets</h2>
-      <p className="budget-settings-hint">Bigger budget = more freedom; tighter budget = harder puzzle. School lunch budget is per child.</p>
+    <section className="budget-settings" aria-label="Time and money settings">
+      <h2 className="budget-settings-title">⚙ Time &amp; money</h2>
+      <p className="budget-settings-hint">
+        Money is spent at the 🛒 Market; cooking costs time. Tighter = harder puzzle. School-lunch time is per child.
+      </p>
       <ul className="budget-list">
+        <li className="budget-row budget-row-money">
+          <span className="budget-meal-label"><span aria-hidden="true">💰</span> Daily shopping money</span>
+          <BudgetStepper icon="💰" unit="coins" value={dailyMoney}
+            onDec={() => onUpdateMoney(-MONEY_LIMITS.step)} onInc={() => onUpdateMoney(MONEY_LIMITS.step)}
+            canDec={dailyMoney > MONEY_LIMITS.min} canInc={dailyMoney < MONEY_LIMITS.max} />
+        </li>
         {BUDGET_ORDER.map(key => {
           const cfg = BUDGET_LABELS[key]
-          const b = budgets[key]
+          const minutes = mealMinutes[key]
           return (
             <li key={key} className="budget-row">
               <span className="budget-meal-label"><span aria-hidden="true">{cfg.emoji}</span> {cfg.label}</span>
-              <BudgetStepper icon="💰" unit="coins" value={b.coins}
-                onDec={() => onUpdate(key, 'coins', -BUDGET_LIMITS.coins.step)} onInc={() => onUpdate(key, 'coins', BUDGET_LIMITS.coins.step)}
-                canDec={b.coins > BUDGET_LIMITS.coins.min} canInc={b.coins < BUDGET_LIMITS.coins.max} />
-              <BudgetStepper icon="⏱" unit="min" value={b.minutes}
-                onDec={() => onUpdate(key, 'minutes', -BUDGET_LIMITS.minutes.step)} onInc={() => onUpdate(key, 'minutes', BUDGET_LIMITS.minutes.step)}
-                canDec={b.minutes > BUDGET_LIMITS.minutes.min} canInc={b.minutes < BUDGET_LIMITS.minutes.max} />
+              <BudgetStepper icon="⏱" unit="min" value={minutes}
+                onDec={() => onUpdateMinutes(key, -MINUTES_LIMITS.step)} onInc={() => onUpdateMinutes(key, MINUTES_LIMITS.step)}
+                canDec={minutes > MINUTES_LIMITS.min} canInc={minutes < MINUTES_LIMITS.max} />
             </li>
           )
         })}
